@@ -33,3 +33,15 @@ verification?* — and proposes the next improvement. See
 ["This is an evolving system"](../agent-loop.md#this-is-an-evolving-system) in the hub doc.
 
 Keep entries short and dated (`YYYY-MM-DD`). Newest first.
+
+## Memory is not the curated vault
+
+This directory is the compact, machine-facing evidence layer. Rich architectural reasoning,
+research notes, recommendations, incidents, and open questions belong in
+[`../vault/`](../vault/obsidian.md). A concise memory entry may link to a detailed vault note when
+the lesson should influence `pipeline-improve`, but the vault does not replace these exact paths.
+
+After the template is copied, project-curated context belongs under
+[`../vault/project/`](../vault/project/README.md). Neither raw memory nor project vault content is
+automatically reusable upstream; first distill the lesson into a neutral rule, test, or machinery
+improvement.

@@ -16,3 +16,18 @@ orchestrator/done/*.md
 orchestrator/.heartbeat
 memory/run-metrics.jsonl
 *.log
+
+# Obsidian personal/device state. Shared vault settings are committed selectively;
+# layouts, plugins, themes, caches, and hotkeys belong to each user.
+.obsidian/workspace*.json
+.obsidian/cache/
+.obsidian/plugins/
+.obsidian/community-plugins.json
+.obsidian/themes/
+.obsidian/snippets/
+.obsidian/graph.json
+.obsidian/hotkeys.json
+
+# Consuming-project attachments are instance-owned and may contain private material.
+vault/project/attachments/*
+!vault/project/attachments/.gitkeep

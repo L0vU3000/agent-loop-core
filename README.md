@@ -40,6 +40,24 @@ tool/path to [`STACK.md`](STACK.md). Fill that one file in and every pipeline kn
 stack — no need to edit 50 pipeline files. `init.mjs` wipes any leftover run/queue data to
 a clean slate and warns you about STACK.md rows you haven't filled in yet.
 
+## Knowledge vault
+
+The repository root is also a zero-plugin Obsidian vault. Open this folder in Obsidian and
+start at [`vault/obsidian.md`](vault/obsidian.md). The curated `vault/` layer provides Maps of
+Content, architecture explanations, operational guides, recommendations, and reusable note
+templates without moving any path used by the machinery.
+
+Three knowledge layers stay separate:
+
+- operational contracts remain at their existing paths under `pipelines/`, `orchestrator/`,
+  and the repository root;
+- compact evidence consumed by `pipeline-improve` remains in `memory/`;
+- richer human context lives in `vault/`, with consuming-project knowledge protected under
+  `vault/project/`.
+
+Shared repository-safe Obsidian settings are committed. Personal layouts, plugins, themes,
+caches, hotkeys, and project attachments are ignored.
+
 ## Layout
 
 ```
@@ -56,14 +74,16 @@ agent-loop/
 │   ├── README.md          ← shared pipeline anatomy
 │   └── EVAL.md            ← the eval contract
 ├── memory/              ← decisions / errors / changelog — self-improvement substrate
+├── vault/               ← curated human knowledge + protected project skeleton
+├── .obsidian/           ← repository-safe shared Obsidian settings
 └── scripts/             ← regression checks + dashboard (run scripts/check-machinery.sh)
 ```
 
 ## Keeping the machinery healthy
 
 `scripts/check-machinery.sh` runs the regression suite over the orchestrator, dispatch,
-eval scoring, and metrics. Run it after touching any `.mjs`. It needs Node ≥ a version
-with `node:test` (Node 18+).
+eval scoring, metrics, and knowledge-vault invariants. Run it after touching machinery or
+curated knowledge. It needs Node ≥ a version with `node:test` (Node 18+).
 
 ## Updating the core across projects
 

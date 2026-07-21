@@ -1,0 +1,14 @@
+{
+  "alwaysUpdateLinks": true,
+  "attachmentFolderPath": "vault/project/attachments",
+  "newFileLocation": "folder",
+  "newFileFolderPath": "vault/project/inbox",
+  "showUnsupportedFiles": false,
+  "userIgnoreFilters": [
+    ".context/",
+    "pipelines/.*/runs/",
+    "orchestrator/inbox/",
+    "orchestrator/done/",
+    "vault/project/attachments/"
+  ]
+}
