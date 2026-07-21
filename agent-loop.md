@@ -188,6 +188,12 @@ common error? which stage is slowest? which pipeline has the weakest verificatio
 proposes the next improvement. Optimizing the system that builds the system is the highest-
 leverage work here (IndyDevDan's "build the system that builds the system").
 
+For durable human context, the repository root is also an Obsidian vault. Start at
+[`vault/obsidian.md`](./vault/obsidian.md). The curated vault explains architecture, research,
+recommendations, and operations; compact `memory/` entries remain the machine-facing evidence
+that `pipeline-improve` ranks. Consuming-project knowledge belongs under `vault/project/` and
+must not be promoted upstream automatically.
+
 ---
 
 ## What's built (the scaffold)
@@ -199,6 +205,7 @@ agent-loop/
 ├── skills-library.md      ← the installed loop toolkit we assemble from
 ├── dashboard.md           ← generated live view: running / queued / completed
 ├── resources/             ← the source library (8 authors)
+├── vault/                 ← curated architecture, guidance, research + project-owned skeleton
 ├── orchestrator/          ← the router (spec) + inbox/ (work items)
 ├── pipelines/             ← twenty-four peer explore → plan → execute → eval workflows
 ├── scripts/               ← dashboard generation + machinery/registry checks

@@ -3,6 +3,10 @@
 Curated primary sources on agent loops / "loop engineering," organized by author.
 Each entry: who they are, the one idea to take, and the link(s). Read in this order.
 
+This file remains the canonical source inventory. The Obsidian research map indexes it at
+[`../vault/maps/research.md`](../vault/maps/research.md); add focused source analysis under
+`vault/research/` only when a source is revisited rather than duplicating this library.
+
 ---
 
 ## 1. Simon Willison — the clearest *definition*

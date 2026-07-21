@@ -311,6 +311,16 @@ fi
 rm -rf "pipelines/zz-selfcheck"
 bash scripts/update-dashboard.sh > /dev/null
 
+# --- 6: curated knowledge vault -------------------------------------------------
+# The repository root is also an Obsidian vault. Keep its shared settings, navigation,
+# operational path boundaries, and tracked-state protections deterministic.
+if node --test scripts/check-vault.regression.mjs > /dev/null; then
+  good "Obsidian vault structure, links, frontmatter, and ownership boundaries pass"
+else
+  bad "Obsidian vault regression check failed"
+  node --test scripts/check-vault.regression.mjs 2>&1 | sed 's/^/      /' || true
+fi
+
 # --- verdict ---------------------------------------------------------------------
 if [ "$fail" -ne 0 ]; then
   say "check-machinery: FAILED"
