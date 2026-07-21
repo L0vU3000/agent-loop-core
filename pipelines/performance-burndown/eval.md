@@ -18,7 +18,7 @@ Independently verify:
    Explore's baseline.
 6. Inspect the complete diff from the last accepted checkpoint. It must contain one approved lever, no
    instrumentation or test edits, no behavior/UX changes, and no unrelated work.
-7. For query work, re-confirm an approved Neon development endpoint and a read-only measurement query.
+7. For query work, re-confirm an approved dev database endpoint (see STACK.md) and a read-only measurement query.
 
 Write:
 

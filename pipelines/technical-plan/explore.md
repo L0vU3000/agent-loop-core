@@ -20,16 +20,16 @@ edit product source. Your only write is `runs/<run-id>/explore.md`.
 4. Gather the real codebase context the plan must be grounded in. Run `graphify query` for the
    affected capability and its closest siblings before reading source, then map the concrete
    touchpoints across every layer the change will cross:
-   - **data/schema** — the real tables and columns in `lib/db/schema/*`;
-   - **service** — the entity module in `lib/services/*` that owns the Drizzle queries;
-   - **action** — the domain action file in `app/actions/*` (or `app/**/*.actions.ts`);
+   - **data/schema** — the real tables and columns in the schema directory;
+   - **service** — the entity module in the services layer that owns the data-layer queries;
+   - **action** — the domain action file in the server-actions directory (or `app/**/*.actions.ts`);
    - **UI** — the real routes and components under `app/**`;
    - **tests** — the existing test locations that cover this area;
    - **migration** — whether the schema moves, and the `db:generate` → `db:migrate` path if so.
    Record exact file paths — the plan and Eval will cite them.
 5. Identify the **closest sibling change** already in the repo (the last entity, feature, or wiring
    of this shape) so the plan can mirror a proven pattern instead of inventing one. Note the
-   standing constraints from `CLAUDE.md` that apply (Neon + Drizzle, server-first, Zod, no Convex,
+   standing constraints from the project conventions doc (see STACK.md) that apply (the database and data layer, server-first (if your framework supports it), input validation, no dead/parallel backend layer,
    no client secrets).
 6. Decide the downstream building `type` this plan will resolve to (`feature`, `bug`, `entity`,
    `wiring`, `migration`, `api-tool`). If more than one slice is implied, name only the first.

@@ -8,7 +8,7 @@ Given `runs/<run-id>/explore.md` (the in-scope values, each value's backing fiel
 the red assertions, the plug-in points), produce `runs/<run-id>/plan.md`:
 
 1. **The wiring** — the smallest change that turns every red traceability assertion green.
-   Name the file(s) and the exact shape: which `lib/services/*` read supplies each value,
+   Name the file(s) and the exact shape: which services-layer (see STACK.md) read supplies each value,
    which Server Action / Server Component threads it to the surface, and which literal each
    real value replaces.
 2. **Reuse over invention** — prefer an existing service query, action, and derivation. New

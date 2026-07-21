@@ -17,8 +17,8 @@ global checks below are critical criteria.
 
    ```sh
    npx stryker run \
-     --mutate 'lib/services/<target>.ts' \
-     --testFiles 'lib/services/<target>.test.ts' \
+     --mutate '<services-dir>/<target>.ts' \
+     --testFiles '<services-dir>/<target>.test.ts' \
      --testRunner vitest \
      --coverageAnalysis perTest \
      --concurrency 2 \
@@ -28,7 +28,7 @@ global checks below are critical criteria.
 
    The score must meet the threshold committed in `runs/<run-id>/plan.md`. List
    surviving mutants in the evidence. For a live-DB lane using a `*.db.test.ts`, point
-   `--testFiles` at that exact file and apply the lane's Neon-dev safety checks first.
+   `--testFiles` at that exact file and apply the lane's dev-database safety checks (see STACK.md) first.
 4. **Global gates** — `npx vitest run` whole suite green · `npx tsc --noEmit` 0 errors ·
    `npx eslint app lib components` no new warnings vs. the run's start.
 

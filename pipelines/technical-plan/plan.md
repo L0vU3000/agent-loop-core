@@ -26,8 +26,8 @@ do not edit source. Write `runs/<run-id>/plan.md`.
      action → UI → tests → migration;
    - **buildable sequencing** — steps are ordered and each depends only on earlier steps;
    - **boundedness** — one slice, explicit out-of-scope;
-   - **constraint fidelity** — the plan honors `CLAUDE.md` (Neon + Drizzle, server-first, Zod, no
-     Convex, no client secrets);
+   - **constraint fidelity** — the plan honors the project conventions doc (see STACK.md) (the database and data layer, server-first (if your framework supports it), input validation, no
+     dead/parallel backend layer, no client secrets);
    - **honest open questions** — owner-only decisions are surfaced, not invented;
    - **complete sections** — the required section contract is present and non-empty.
    Set a pass threshold from 80–100 (use 85 unless the task argues otherwise).

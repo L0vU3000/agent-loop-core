@@ -4,21 +4,21 @@ You are the Plan stage. Read `runs/<run-id>/explore.md`. Do not edit source or t
 
 Write `runs/<run-id>/plan.md` with:
 
-1. The approved field-by-field mapping from Zod to Drizzle, including timestamps, numeric
+1. The approved field-by-field mapping from the validation layer (see STACK.md) to the data layer (ORM), including timestamps, numeric
    conversion, enum names, optionality, defaults, indexes, and cascade behavior.
 2. The exact files to add or modify:
-   - `lib/data/types/<entity>.ts`;
-   - the appropriate `lib/db/schema/*.ts` module and `index.ts` if needed;
-   - `lib/services/<entities>.ts` using `_crud.ts` and org-scoped reads;
-   - `app/actions/<entities>.ts` with Zod validation, auth, generic client errors, and cache busting;
-   - one generated Drizzle migration and snapshot;
-   - `scripts/seed-neon.ts`, including both its load plan and complete table list, plus a
+   - `<entity>.ts` in the shared types directory;
+   - the appropriate module in the schema directory and its `index.ts` barrel if needed;
+   - `<entities>.ts` in the services layer using `_crud.ts` and org-scoped reads;
+   - `<entities>.ts` in the server-actions directory with validation-layer checks, auth, generic client errors, and cache busting;
+   - one generated database migration and snapshot;
+   - the seed script, including both its load plan and complete table list, plus a
      meaningful fixture under `tests/fixtures/`;
    - `scripts/schema-assert.ts` table count and domain-table inventory;
    - the unchanged focused contract and live-DB tests.
 3. The parent-authorization path: create and any update that changes `propertyId` must prove
    that the referenced property belongs to `ctx.orgId` before writing.
-4. The command sequence, including the development-branch check before migration generation,
+4. The command sequence, including the dev-database check before migration generation,
    migration application, seeding, and live tests.
 5. Blast radius and rollback. Rollback means reverting the worktree before merge; do not emit
    a destructive down migration.

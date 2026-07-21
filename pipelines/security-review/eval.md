@@ -16,7 +16,7 @@ anything you cannot stand up.
    or re-read the cited `file:line` with `graphify` and targeted reads to confirm the code actually
    is unsafe in the way claimed.
 2. **No false positives (critical)** — **drop** any finding you cannot stand up: the "missing"
-   authz/ownership check actually exists in a shared helper upstream, the input is already Zod-
+   authz/ownership check actually exists in a shared helper upstream, the input is already input-
    validated before the query, the value is not truly a secret, or the client only receives selected
    fields. Record what you dropped and why. A hallucinated or unreproducible vulnerability that
    survives to the owner is a critical failure of this pipeline.

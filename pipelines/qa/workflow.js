@@ -5,7 +5,7 @@
 // minted in explore and threaded through every stage (lesson from memory/errors.md).
 //
 // Optionally pass routes as args, e.g.
-// Workflow({scriptPath, args: '/, /property/PROP-0001/documents'})
+// Workflow({scriptPath, args: '/, /<entity>/<id>/<tab>'})
 
 export const meta = {
   name: 'qa',
@@ -71,9 +71,9 @@ const drive = await agent(
    First mint ONE run-id for this whole execution: \`date "+%Y-%m-%d-%H%M%S"\`, then
    \`mkdir -p ${P}/runs/<run-id>\` — every later stage writes ONLY into that folder.
    Use ToolSearch to load the Playwright browser tools and reproduce the browser setup in
-   e2e/fixtures.ts. Reuse the dev server on port 3001 if it answers; otherwise start
-   \`npm run dev:e2e\` in the background. NEVER wait on
-   networkidle. Confirm .env.local is not the prod endpoint (ep-aged-cloud-*) before flows
+   e2e/fixtures.ts. Reuse the dev server on the dev server port if it answers; otherwise start
+   the e2e dev-server command (see STACK.md) in the background. NEVER wait on
+   networkidle. Confirm the dev environment config is not the prod endpoint (the prod database endpoint id in STACK.md) before flows
    that write. Use \`graphify query\` to orient before reading code. Record per-route status
    and ranked findings with evidence. Return runId and findingCount (0 if nothing is broken).`,
   { label: 'explore', schema: FINDINGS, ...TIER.read })

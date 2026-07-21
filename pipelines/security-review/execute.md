@@ -4,31 +4,31 @@ You are the maker. Follow the approved `runs/<run-id>/plan.md`. Your only writes
 report and any drafted fix tickets under `runs/<run-id>/`. Do not edit product source, schema,
 migrations, seed data, or the live orchestrator inbox. The installed `/cso` (Chief Security Officer
 mode) and `/security-review` skills are your reviewing engines. This is authorized defensive review
-of the Valgate codebase — document vulnerabilities and their impact; do not write a reusable
+of the app's codebase (see STACK.md) — document vulnerabilities and their impact; do not write a reusable
 exploit.
 
 ## Review the change
 
 Review only the files and hunks the plan named as in scope, against the security rules the plan
 mapped to each. Use `graphify query`/`path` to orient before reading source. Hunt the change for
-vulnerabilities against this repo's standing **Security Rules** (`CLAUDE.md`):
+vulnerabilities against this repo's standing **Security Rules** (the project conventions doc):
 
 - **Missing authN / authZ** — a mutation or protected read that does not verify who the caller is,
   or does not verify they may perform this action.
 - **IDOR / missing ownership** — a resource fetched or mutated by id without confirming it belongs
   to the current user or org.
-- **Unvalidated input reaching the DB** — raw `FormData`/params/body reaching a Drizzle query with
-  no Zod parse first.
+- **Unvalidated input reaching the DB** — raw `FormData`/params/body reaching a data-layer query with
+  no input validation first.
 - **Error leakage** — `err.message` or a raw error returned to the client instead of a logged-
   internally, generic string.
-- **Secret exposure** — a secret prefixed with `NEXT_PUBLIC_`, or a secret/credential passed as a
+- **Secret exposure** — a secret exposed through a client-bundled/public env var (e.g. a `NEXT_PUBLIC_`-style prefix), or a secret/credential passed as a
   prop into a Client Component.
 - **Missing rate limiting** — login, signup, or another sensitive action with no rate limit.
 - **Over-exposure to the client** — a full DB object sent as props where the UI needs only selected
   fields.
 
 Before reporting any finding, confirm the guard is genuinely absent: check for a shared helper (an
-ownership/`requireOwner` check, a Zod schema, a `select` projection) upstream that already closes
+ownership/`requireOwner` check, a validation-layer schema, a `select` projection) upstream that already closes
 the hole. Do not report a hardening preference as if it were a live vulnerability, and do not stray
 into correctness, architecture, or design findings — those route to other pipelines.
 

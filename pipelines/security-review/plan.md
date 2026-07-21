@@ -7,7 +7,7 @@ and do not edit source. Write `runs/<run-id>/plan.md`.
 
 1. The **review scope** for this change, bound to the ticket: the exact files and hunks the maker
    must review, taken from Explore's attack-surface map, and **which security rules apply to each**
-   (authN/authZ + ownership, Zod input validation, error-message leakage, `NEXT_PUBLIC_`/secret
+   (authN/authZ + ownership, input validation, error-message leakage, a client-bundled/public env var (e.g. a `NEXT_PUBLIC_`-style prefix) or secret
    exposure, rate limiting, full-DB-object props). State explicitly what is out of scope (files the
    change does not touch, pre-existing debt) so the review neither skips the change nor wanders
    outside it.

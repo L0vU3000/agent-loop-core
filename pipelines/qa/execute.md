@@ -15,8 +15,8 @@ judge whether they worked — that's the `eval` stage (a separate agent, fresh b
 
 ## Rules
 
-- Data safety: the app runs against the Neon dev branch; rows you create while checking use
-  `QA-PIPELINE-*` names; never `seed:reset`.
+- Data safety: the app runs against the dev database (see STACK.md); rows you create while checking use
+  `QA-PIPELINE-*` names; never run a destructive seed reset.
 - If a fix turns out to need more than the plan said, stop and write what you found —
   don't improvise a redesign.
 - Hand off to `eval`. Do not re-drive all flows and declare success — the verifier is

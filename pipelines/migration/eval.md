@@ -14,17 +14,17 @@ backend schema and touches a development database.
    approved additive change, or any invented field.
 2. Confirm the focused schema-presence assertion is unchanged from Explore and went red → green
    for the intended reason (the target object was absent before, present after).
-3. Inspect the layers: the Drizzle table definition adds exactly the approved object; any
-   exposed Zod field matches; `scripts/schema-assert.ts` names the new object; the tenant
+3. Inspect the layers: the schema definition (see STACK.md) adds exactly the approved object; any
+   exposed validation-layer field matches; `scripts/schema-assert.ts` names the new object; the tenant
    columns stay non-null; the journal entry exists with a monotonic `when`.
 4. Inspect the hand-authored SQL migration. Fail on unrelated drift, `DROP`, `TRUNCATE`, rename,
    type narrowing, or any data-losing rewrite; confirm any backfill only fills the new field.
    Run `npm run db:check` and grade it **relative to the Explore baseline**, the same way ESLint
    is graded: the migration passes only when (a) the manual additive/non-destructive inspection
    above passes, and (b) `db:check` shows no *new* collision versus Explore's recorded baseline.
-   This repo carries a pre-existing, accepted `drizzle-kit` snapshot collision (0008/0011) that
+   This repo carries a pre-existing, accepted migration-tool snapshot collision (0008/0011) that
    aborts `db:check` upstream of any new migration and gives no signal about it (see
-   `vault/decisions/drizzle-only-hand-authored-migrations.md`); an unchanged baseline failure is
+   the project's hand-authored-migrations decision); an unchanged baseline failure is
    not this run's failure, but any *new* collision the migration introduces is.
 5. Confirm the endpoint is the approved development branch, then confirm the migration applied
    cleanly, `npm run db:assert` passes, and the new schema object is present in the live schema.

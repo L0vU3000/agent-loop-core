@@ -14,10 +14,10 @@ below are critical criteria.
    maker's session). For each route/flow in `runs/<run-id>/explore.md`'s scope: navigate,
    wait on the key landmark, exercise the flow's interactions, and confirm the specific
    findings the run set out to fix are gone. Reproduce the shared `e2e/fixtures.ts` setup:
-   block `**clerk.accounts.dev/**`, set `window.__E2E__ = true`, and inject its Clerk-overlay
+   block the hosted auth-provider (see STACK.md) sign-in requests, set `window.__E2E__ = true`, and inject its auth-provider-overlay
    CSS.
 2. **Console clean** — zero product console *errors* per route (list warnings, don't fail on
-   them). Record the intentionally blocked Clerk request separately as test-rig noise.
+   them). Record the intentionally blocked auth-provider request separately as test-rig noise.
 3. **Network clean** — no unexpected 4xx/5xx from normal flow usage.
 4. **Global gates** — `npx vitest run` green · `npx tsc --noEmit` 0 errors ·
    `npx eslint app lib components` no new warnings vs. the run's start.

@@ -201,7 +201,7 @@ if (!MIGRATION_APPROVED) {
   const authored = await agent(
     `You are EXECUTE Phase A, the maker. Follow ${P}/execute.md and the approved plan at
      ${P}/runs/${RUN}/plan.md. Update the schema definition and hand-author the additive
-     migration SQL (drizzle-kit generate is broken here), then STOP before applying it or
+     migration SQL (the migration tool's generate step is broken here), then STOP before applying it or
      running DB writes. Record the exact migration path, its SHA-256 digest, and
      migration-status: awaiting-approval in execute.md. Do not change Explore's assertion.`,
     { label: 'execute-author', phase: 'Author migration', schema: AUTHORED, model: 'opus' },
@@ -252,7 +252,7 @@ await agent(
    already applied at this digest on a prior attempt, a "no pending migrations" / already-applied
    result is success, not a failure; do not re-create or alter anything), run schema assertion,
    any approved additive backfill, and confirm the live schema object, then append attempt
-   ${attempt} evidence to execute.md. Never use production, seed:reset, or ALLOW_DESTRUCTIVE_DB=1.`,
+   ${attempt} evidence to execute.md. Never use production, a destructive seed reset, or ALLOW_DESTRUCTIVE_DB=1.`,
   { label: `execute-apply#${attempt}`, phase: 'Apply and verify', model: 'opus' },
 )
 

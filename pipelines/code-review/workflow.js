@@ -77,7 +77,7 @@ const frame = await agent(
    Use \`graphify query\` to orient before reading code. Apply the scope gate: accept only a request
    to REVIEW an existing change that names a real branch/diff/PR with an actual diff. Resolve the
    base/head and record the exact files and hunks in scope, then map the change (services, actions,
-   components, schema, callers) and the CLAUDE.md constraints it must respect. Return accepted,
+   components, schema, callers) and the constraints in the project conventions doc (see STACK.md) it must respect. Return accepted,
    runId, the downstream building targetType a confirmed high-severity finding resolves to, and the
    reviewTarget. If the request is a build/fix job, a security audit (→ security-review), a structure
    audit (→ architecture-review), a design critique (→ design-review), or a target with no diff, set

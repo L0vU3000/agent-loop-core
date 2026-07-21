@@ -16,8 +16,8 @@ Fill every section the plan named, and no more:
   `modify` path must exist in the repo today; every `create` path must sit beside a real sibling
   and say which pattern it copies. State in one line what changes in each file.
 - **Layered touchpoints** — walk the layers this slice crosses and what each contributes:
-  data/schema (`lib/db/schema/*`), service (`lib/services/*`, the Drizzle queries), action
-  (`app/actions/*`), UI (routes and components under `app/**`), tests (the real test locations),
+  data/schema (the schema directory), service (the services layer, the data-layer queries), action
+  (the server-actions directory), UI (routes and components under `app/**`), tests (the real test locations),
   and a migration step (`db:generate` → `db:migrate`) when the schema moves. Say explicitly which
   layers this slice does **not** touch.
 - **Implementation sequence** — the ordered steps a builder follows top to bottom. Each step
@@ -25,9 +25,9 @@ Fill every section the plan named, and no more:
   service before the action, the action before the UI, and the tests where they gate each step.
 - **Rollback** — how to undo the slice cleanly (the migration to reverse, the files to revert),
   and anything that makes rollback non-trivial.
-- **Risks** — what could go wrong in the build, and the standing `CLAUDE.md` constraints this must
-  respect (Neon + Drizzle services, server-first components, Zod-validated mutations, no client
-  secrets, no Convex).
+- **Risks** — what could go wrong in the build, and the standing project conventions doc (see STACK.md) constraints this must
+  respect (the database and services layer, server-first components (if your framework supports it), input-validated mutations, no client
+  secrets, no dead/parallel backend layer).
 - **Open questions** — every owner-only decision left unmade (a library choice, a data-model
   trade-off, a UX call). Do NOT invent an answer; list it here.
 

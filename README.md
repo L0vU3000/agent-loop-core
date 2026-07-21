@@ -25,17 +25,20 @@ freely. See `agent-loop.md` for the operating principles.
 cd /path/to/your-project
 npx degit your-org/agent-loop-core agent-loop
 
-# 2. Reset instance data + get a report of prose to adapt
+# 2. Reset instance data + check STACK.md
 node agent-loop/init.mjs
 
-# 3. Run one tick (empty inbox is fine — it just heartbeats)
+# 3. Fill in agent-loop/STACK.md — your database / ORM / auth / services layer
+
+# 4. Run one tick (empty inbox is fine — it just heartbeats)
 node agent-loop/orchestrator/tick.mjs
 ```
 
-`init.mjs` wipes any leftover run/queue data to a clean slate and lists every pipeline
-`.md` still using the origin project's vocabulary (Neon, Drizzle, Clerk, …) so you know
-exactly which prose to rewrite for your stack. The machinery itself is project-neutral
-and runs immediately.
+The pipelines are already project-neutral: they refer to your stack by **role** (the
+database, the data layer, the auth provider, the services layer) and defer the concrete
+tool/path to [`STACK.md`](STACK.md). Fill that one file in and every pipeline knows your
+stack — no need to edit 50 pipeline files. `init.mjs` wipes any leftover run/queue data to
+a clean slate and warns you about STACK.md rows you haven't filled in yet.
 
 ## Layout
 

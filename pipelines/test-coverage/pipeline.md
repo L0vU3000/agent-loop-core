@@ -6,7 +6,7 @@ type: test
 
 # Pipeline: test-coverage
 
-> **Pipeline #3 — strengthens the substrate.** Picks an untested `lib/services/*` module and
+> **Pipeline #3 — strengthens the substrate.** Picks an untested services-layer (see STACK.md) module and
 > writes real unit tests for it. Every other pipeline's eval leans on "the suite is green",
 > so making the suite *mean more* is the highest-leverage testing work. The verification
 > below is deliberately stronger than "the new tests pass" — a passing test that can't catch
@@ -50,8 +50,9 @@ A run **passes** only when ALL are true:
   runs it and reads the score. The vitest runner (`@stryker-mutator/vitest-runner`, added in
   StrykerJS 7, actively maintained) uses perTest coverage analysis, so runs scoped to one
   module stay fast ([stryker-mutator.io vitest runner](https://stryker-mutator.io/docs/stryker-js/vitest-runner/)).
-- **Scope control:** always pair `--mutate 'lib/services/<target>.ts'` with
-  `--testFiles 'lib/services/<target>.test.ts'` and `--testRunner vitest`. This proves the
+- **Scope control:** always pair `--mutate '<services-dir>/<target>.ts'` with
+  `--testFiles '<services-dir>/<target>.test.ts'` and `--testRunner vitest` (where `<services-dir>`
+  is your services directory — see STACK.md). This proves the
   target's focused tests can kill its mutants without getting accidental help from the
   rest of the suite. Never run whole-repo mutation; this pipeline works one module at a
   time.
@@ -63,7 +64,7 @@ Recorded in [`memory/decisions.md`](../../memory/decisions.md).
 `explore → plan → execute → eval`, separate agents; `execute` is the **maker**, `eval` is a
 **separate verifier** on a different model.
 
-- **explore** — measure baseline coverage, pick the highest-value untested `lib/services/*`
+- **explore** — measure baseline coverage, pick the highest-value untested services-layer
   module, list the behaviors worth testing, and decide the **test lane** (below).
 - **plan** — enumerate concrete test cases (happy path, edge, error) and commit to a
   mutation-score threshold.
@@ -73,12 +74,13 @@ Recorded in [`memory/decisions.md`](../../memory/decisions.md).
 
 ## Test lanes (explore picks one per module)
 
-- **Default lane (preferred):** DB-free tests in the main suite — mock the Drizzle `db`
+- **Default lane (preferred):** DB-free tests in the main suite — mock the data-layer `db`
   client or test pure logic (mapping, validation, derivation). Fast, runs everywhere.
 - **Live-DB lane:** `*.db.test.ts` under `vitest.config.db.ts` for modules that are nothing
-  but queries. These hit the **Neon dev branch** via `DATABASE_URL` from `.env.local`.
-  Rules: confirm the branch is dev before writing (never prod `ep-aged-cloud-*`), **never
-  `seed:reset`**, create-your-own rows with recognizable ids and delete them afterward —
+  but queries. These hit the **dev database** via the dev database connection string (e.g.
+  `DATABASE_URL`) from the dev environment config.
+  Rules: confirm the database is dev before writing (never prod), **never run
+  a destructive seed reset**, create-your-own rows with recognizable ids and delete them afterward —
   never mutate or delete seed rows.
 
 ## Guardrails

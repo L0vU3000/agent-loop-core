@@ -19,7 +19,7 @@ continue to work with one stable layout.
 | Category | Purpose | Example pipelines | Default human gate |
 |---|---|---|---|
 | `planning` | Turn an unclear request into an approved scope, specification, or technical plan. | `spec`, `research`, `technical-plan` | Approve the output before any building pipeline starts. |
-| `building` | Change the Valgate product: features, fixes, data wiring, backend entities, or interfaces. | `feature`, `bug-fix`, `entity-scaffold`, `wiring`, `migration`, `api-tool` | Approve the plan and review the finished result. |
+| `building` | Change the product: features, fixes, data wiring, backend entities, or interfaces. | `feature`, `bug-fix`, `entity-scaffold`, `wiring`, `migration`, `api-tool` | Approve the plan and review the finished result. |
 | `review` | Inspect an existing change or surface and produce evidence-backed findings. | `code-review`, `design-review`, `security-review`, `architecture-review` | Review findings; product or design judgment stays with the owner. |
 | `testing` | Improve or exercise the verification system itself, or run a dedicated health/regression pass. | `test-coverage`, `qa`, `e2e-regression` | Review quarantines, policy choices, and any product changes discovered during testing. |
 | `maintenance` | Perform bounded upkeep against a measurable backlog or health signal. | `eslint-burndown`, `pipeline-improve`, `dependency-maintenance`, `performance-burndown` | May become scheduled after the pipeline proves safe and bounded. |

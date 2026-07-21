@@ -39,7 +39,7 @@ unattended without lying to itself.
 - [ ] an `eval` stage that is a **separate verifier** citing evidence
 - [ ] a Plan-authored **100-point Eval rubric** whose weights total 100, threshold is 80–100,
       and safety/regression gates are critical
-- [ ] **guardrails**: worktree isolation; Neon dev branch (never prod / `seed:reset`)
+- [ ] **guardrails**: worktree isolation; dev database (never prod / no destructive seed reset)
 - [ ] **bounds**: max-iterations / max-time
 - [ ] **memory**: failures logged to [`../memory/errors.md`](../memory/errors.md)
 
@@ -47,14 +47,14 @@ unattended without lying to itself.
 
 | Category | Pipeline | Type | Status |
 |---|---|---|---|
-| `maintenance` | [`eslint-burndown`](./eslint-burndown/pipeline.md) | `lint` | ✅ automated (Workflow), proven |
-| `building` | [`bug-fix`](./bug-fix/pipeline.md) | `bug` | ✅ proven by hand and automated on the co-owner data-loss ticket |
-| `building` | [`feature`](./feature/pipeline.md) | `feature` | ✅ proven by hand — Sole-Ownership confirmed cleanup, acceptance tests red→green |
+| `maintenance` | [`eslint-burndown`](./eslint-burndown/pipeline.md) | `lint` | authored — template; adapt and run |
+| `building` | [`bug-fix`](./bug-fix/pipeline.md) | `bug` | authored — template; adapt and run |
+| `building` | [`feature`](./feature/pipeline.md) | `feature` | authored — template; adapt and run |
 | `building` | [`entity-scaffold`](./entity-scaffold/pipeline.md) | `entity` | authored — training mode; proof waits for an approved ordinary property-child entity |
-| `testing` | [`test-coverage`](./test-coverage/pipeline.md) | `test` | ✅ proven by hand — `portfolio-shared.ts` 0%→100% coverage, 100% mutation score |
-| `testing` | [`qa`](./qa/pipeline.md) | `qa` | ✅ proven by hand — 8/8 flows; WebGL crash + duplicate React key fixed; 183/183 global tests |
-| `testing` | [`e2e-regression`](./e2e-regression/pipeline.md) | `e2e` | ✅ proven by hand — run `2026-07-16-030754`: 9 failures triaged (Agentation-in-DEMO fixed, `/activity` scope-cut, P3/C3/F5 contract fixes, 5 wizard/bulk-bar flakes quarantined+ticketed); 2× green |
-| `maintenance` | [`pipeline-improve`](./pipeline-improve/pipeline.md) | `pipeline-improve` | ✅ proven by hand — registry drift rejected across 4 sources; 195/195 global tests |
+| `testing` | [`test-coverage`](./test-coverage/pipeline.md) | `test` | authored — template; adapt and run |
+| `testing` | [`qa`](./qa/pipeline.md) | `qa` | authored — template; adapt and run |
+| `testing` | [`e2e-regression`](./e2e-regression/pipeline.md) | `e2e` | authored — template; adapt and run |
+| `maintenance` | [`pipeline-improve`](./pipeline-improve/pipeline.md) | `pipeline-improve` | authored — template; adapt and run |
 | `maintenance` | [`dependency-maintenance`](./dependency-maintenance/pipeline.md) | `dependency` | authored — approval-gated npm backlog batches; first proof waits for a genuine dependency item |
 | `maintenance` | [`performance-burndown`](./performance-burndown/pipeline.md) | `perf` | authored — fixed-recipe median measurement and behavior gate; first proof waits for a measured target |
 | `planning` | [`spec`](./spec/pipeline.md) | `spec` | authored — planning template; read-only, first proof waits for a real request |
@@ -66,7 +66,7 @@ unattended without lying to itself.
 | `review` | [`architecture-review`](./architecture-review/pipeline.md) | `architecture-review` | authored — read-only structural findings on a subsystem; first proof waits for a target |
 | `building` | [`wiring`](./wiring/pipeline.md) | `wiring` | authored — wires mock/placeholder values on a surface to real services; first proof waits for a target |
 | `building` | [`migration`](./migration/pipeline.md) | `migration` | authored — one additive DB migration, approval-gated on a dev branch; first proof waits for a change |
-| `building` | [`api-tool`](./api-tool/pipeline.md) | `api-tool` | authored — wraps an existing service as an MCP tool via `ctxFor`; first proof waits for a target |
+| `building` | [`api-tool`](./api-tool/pipeline.md) | `api-tool` | authored — wraps an existing service as an MCP tool via the request-context seam; first proof waits for a target |
 | `delivery` | [`landing`](./landing/pipeline.md) | `landing` | authored — verifies and lands one reviewed revision after an exact merge approval; first proof waits for a reviewed change |
 | `delivery` | [`deploy`](./deploy/pipeline.md) | `deploy` | authored — deploys one landed commit to one named environment after approval; first proof waits for a non-production target |
 | `delivery` | [`canary`](./canary/pipeline.md) | `canary` | authored — observes approved post-deploy signals and separately gates rollback; first proof waits for a defined deployment baseline |

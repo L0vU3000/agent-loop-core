@@ -60,8 +60,8 @@ A run passes only when every check is true:
    fields that pipeline's own scope gate requires (for an `entity`, the full field contract; for
    a `feature`, testable acceptance criteria). It is written with `approved: false` so it cannot
    be dispatched until the owner approves.
-8. The spec respects the codebase's standing constraints (`CLAUDE.md`): Neon + Drizzle services,
-   server-first components, Zod-validated mutations, no secrets to the client, no Convex.
+8. The spec respects the codebase's standing constraints (the project conventions doc, see STACK.md): the database and data-layer services,
+   server-first components (if your framework supports it), input-validated mutations, no secrets to the client, no dead/parallel backend layer.
 
 The score reaches the Plan threshold with zero critical failures. The owner then approves the
 spec's content before the drafted ticket is promoted to the inbox.

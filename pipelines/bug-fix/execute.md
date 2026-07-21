@@ -15,6 +15,6 @@ whether it worked — that's the `eval` stage (a separate agent).
 ## Rules
 
 - Root cause only. No symptom patches, no `try/catch` that swallows the real problem.
-- If the bug touches data, use the **Neon dev branch** — never prod, never `seed:reset`.
+- If the bug touches data, use **the dev database (see STACK.md)** — never prod, never run a destructive seed reset.
 - Hand off to `eval`. Do not run the suite and declare success — the verifier is separate
   on purpose.

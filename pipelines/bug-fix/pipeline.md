@@ -40,8 +40,8 @@ re-verify isn't a fix.
 ## Guardrails
 
 - **Isolation:** run in a git worktree.
-- **Data safety:** if the bug touches data, use a **Neon dev branch** — never prod, **never
-  `seed:reset`**.
+- **Data safety:** if the bug touches data, use **the dev database (see STACK.md)** — never prod, **never
+  run a destructive seed reset**.
 - **Root cause, not symptom:** fix the cause the reproduction exposes; don't paper over it.
 - **Bounds:** `max-iterations: 6`, `max-time: 60m`.
 - **Escalate on ambiguity:** if the root cause is unclear or the fix needs a product decision,

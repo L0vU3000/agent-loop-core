@@ -24,8 +24,8 @@ objective; the owner still approves whether it is the right thing to build.
    answered by invention.
 7. **Valid drafted ticket** — `proposed-ticket.md` exists, targets a real building `category`/`type`,
    carries the fields that pipeline's scope gate requires, and is marked `approved: false`.
-8. **Constraints respected** — the spec honors `CLAUDE.md` (Neon + Drizzle services, server-first,
-   Zod-validated mutations, no Convex, no client secrets).
+8. **Constraints respected** — the spec honors the project conventions doc (see STACK.md) (the database and data-layer services, server-first (if your framework supports it),
+   input-validated mutations, no dead/parallel backend layer, no client secrets).
 
 ## Verdict format
 

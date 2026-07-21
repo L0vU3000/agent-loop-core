@@ -75,7 +75,7 @@ Every Eval failure writes evidence and returns to Plan before another Execute at
   `--resume=<run-id> --approved-plan`.
 - **Isolation:** one run per git worktree. Successful batches create local checkpoint commits only;
   they are never pushed or landed by this pipeline.
-- **No database access:** never connect to Neon and never run `seed:reset`.
+- **No database access:** never connect to the database (see STACK.md) and never run a destructive seed reset.
 - **Small batches:** 1–5 runtime packages or 3–8 development packages. Do not mix a risky package
   into a mechanical batch.
 - **Bounds:** at most 6 accepted or rejected batch attempts, 7 agent calls per invocation, and a

@@ -1,8 +1,8 @@
-# Agent Loops for Valgate
+# Agent Loops
 
 > Goal: stop hand-prompting one task at a time. Build **loops** — small systems that
 > find work, hand it to an agent, verify the result, record what happened, and decide
-> the next step — so Valgate work runs on a cadence instead of a keystroke.
+> the next step — so your project's work runs on a cadence instead of a keystroke.
 
 This is the home doc. Read [`categories.md`](./categories.md) for how the orchestrator
 organizes many peer pipelines across planning, building, review, testing, maintenance, and
@@ -56,11 +56,11 @@ Karpathy's point: the leverage is in *speeding up verification*, not writing lon
 
 From Boris Cherny (built Claude Code) and Dex Horthy (12-Factor Agents):
 
-| Piece | What it does | In practice for Valgate |
+| Piece | What it does | In practice |
 |---|---|---|
-| **1. Goal** | A recursive purpose the agent iterates toward | "Every failing test in `tests/authz/` is green" |
-| **2. Verification** | A *separate* agent/test decides pass/fail — the single most important design choice | `npm run test`, `tsc`, `/verify`, a second agent reviewing the diff |
-| **3. Memory** | State written to a file so tomorrow's run resumes today's | `CLAUDE.md` for lessons; a `progress.md` for where it stopped |
+| **1. Goal** | A recursive purpose the agent iterates toward | "Every failing test in the auth test suite is green" |
+| **2. Verification** | A *separate* agent/test decides pass/fail — the single most important design choice | the test command, the typechecker, `/verify`, a second agent reviewing the diff |
+| **3. Memory** | State written to a file so tomorrow's run resumes today's | the project conventions doc for lessons; a `progress.md` for where it stopped |
 | **4. Scheduling** | Discovery + triage on a cadence, terminal open or not | cron / `/loop` / a nightly routine |
 | **5. Guardrails** | Isolation + least-privilege creds so an autonomous run can't hurt you | git worktrees, test/staging DB branch, scoped keys |
 
@@ -125,7 +125,7 @@ Good loops have **a clear success signal and a trial-and-error shape** (Simon Wi
 - ✅ Fix failing tests / typecheck errors (the signal is literally green/red)
 - ✅ Performance or bundle-size optimization (measure → change → re-measure)
 - ✅ Dependency upgrades (does it still build + pass?)
-- ✅ Data-audit / wiring sweeps across many files (Valgate has a whole corpus for this)
+- ✅ Data-audit / wiring sweeps across many files (large codebases accumulate these)
 - ❌ Anything where "done" is a matter of taste with no measurable check — keep human-in-loop
 
 ---
@@ -136,22 +136,22 @@ Autonomy without guardrails is how you lose data. Before sliding right:
 
 1. **Isolate** — run in a git worktree or container, never straight on `main`.
 2. **Least privilege** — give the loop a **test/staging** DB branch and scoped keys, not prod.
-   - Valgate rule already on the books: **never `seed:reset`** — it destroys evolved seed data.
-   - Neon dev branch, not the prod branch, for any loop that writes.
+   - Standing rule (see STACK.md): **never run a destructive seed reset** — it destroys evolved seed data.
+   - The dev database, not the prod one, for any loop that writes.
 3. **Budget the blast radius** — small scope, one domain at a time, reversible steps.
 4. **Keep context lean** — Horthy's "dumb zone": model recall degrades in the middle
    40–60% of a big context window. Less context in the loop = better decisions.
 
 ---
 
-## Valgate loop starter ideas (ranked by how airtight the verification is)
+## Loop starter ideas (ranked by how airtight the verification is)
 
-1. **Green-the-authz-suite loop** — goal: `tests/authz/` 26/26 stays green after edits.
-   Verification = `npm run test`. Airtight. Great first loop.
-2. **tsc-error burndown loop** — goal: drive the M5 wiring worklist (~438 tsc errors) down.
-   Verification = `tsc` count strictly decreasing. Airtight.
-3. **Data-wiring sweep loop** — goal: eliminate mock/placeholder values per the WIRING-PLAYBOOK.
-   Verification = a second agent checks each value traces to a schema field. Semi-airtight.
+1. **Green-the-test-suite loop** — goal: a chosen test suite stays green after edits.
+   Verification = the test command. Airtight. Great first loop.
+2. **Typecheck-error burndown loop** — goal: drive a backlog of type errors down.
+   Verification = the typechecker's error count strictly decreasing. Airtight.
+3. **Data-wiring sweep loop** — goal: eliminate mock/placeholder values across the codebase.
+   Verification = a second agent checks each value traces to a real field. Semi-airtight.
 4. **QA-and-fix loop** — goal: no console errors / broken flows on key routes.
    Verification = the `/qa` browser agent. Semi-airtight; keep human-in-loop early.
 
@@ -176,7 +176,7 @@ it as "done," it starts rotting: pipelines drift, the same errors recur, slow st
 slow. So the system must **always be searching for ways to optimize itself.**
 
 That's what [`memory/`](./memory/README.md) is for — the agent-loop's own mini-vault, mirroring
-the repo's [Obsidian vault](../vault/obsidian.md):
+whatever project knowledge vault you keep:
 
 - [`memory/changelog.md`](./memory/changelog.md) — what changed in the machinery, dated.
 - [`memory/decisions.md`](./memory/decisions.md) — why the loop is built this way (ADRs).
@@ -205,36 +205,31 @@ agent-loop/
 └── memory/                ← changelog · decisions · errors (self-improvement)
 ```
 
-## Current build position
+## What ships in the template
 
-Twenty-four pipelines are defined. `eslint-burndown`, `bug-fix`, `feature`, `test-coverage`, `qa`,
-`pipeline-improve`, and `e2e-regression` have successful real runs. The `building` category has
-gained three more authored pipelines — `wiring` (mock→real service wiring), `migration` (one
-additive, approval-gated schema change on a dev branch), and `api-tool` (wrap an existing service
-as an MCP tool via `ctxFor`) — mirroring `feature` and `entity-scaffold`'s worktree + dev-branch
-guardrails. The `planning` category holds
-three authored pipelines — `spec`, `research`, and `technical-plan` — read-only document-producers
-whose verification grades grounding, testability, and completeness rather than tests. The `review`
-category holds four — `code-review`, `design-review`, `security-review`, and `architecture-review`
-— read-only findings-producers verified by adversarial re-verification (each reported finding must
-reproduce, or it is dropped). The maintenance category now also holds `dependency-maintenance`
-(approved npm backlog batches) and `performance-burndown` (fixed-recipe median measurement toward
-one target). Both are locked in training mode and await genuine work. The delivery category now
-holds `landing`, `deploy`, `canary`, and `release`: approval-gated wrappers around installed `ship`,
-`setup-deploy`, `land-and-deploy`, `canary`, and `document-release` capabilities. They separate
-merge, deployment, observation/rollback, and release sign-off so one approval cannot silently
-authorize the next risk level. All four await genuine work and no live delivery proof was run during
-authoring. The first `pipeline-improve` proof made registry
-metadata drift fail across pipeline frontmatter and all three registry tables. The `e2e-regression` proof (run `2026-07-16-030754`) triaged nine active-suite failures
-by evidence — an Agentation-in-DEMO console leak fixed at the app, `/activity` scope-cut as a
-removed surface, three outdated-contract spec fixes, and five wizard/bulk-bar flakes quarantined
-with tickets — reaching two consecutive green runs. `entity-scaffold` is authored behind an
-explicit product-scope and Plan approval gate; its first real proof waits for an approved entity
-ticket. The orchestrator's routing + bookkeeping half is now executable code —
-`orchestrator/dispatch.mjs` validates each inbox item against the canonical registry, emits
-the dispatch plan in priority order, and records outcomes; the Workflow runtime still executes
-the selected `workflow.js`.
+Twenty-four pipelines are defined across the categories in [`categories.md`](./categories.md):
 
-Next: prove the new maintenance and delivery pipelines only when genuine work reaches them, starting
-delivery in a named non-production environment. Everything runs on built-in primitives, so the
-system stays independent of external agent daemons.
+- **building** — `feature`, `bug-fix`, `entity-scaffold`, `wiring`, `migration`, `api-tool`:
+  make a change, each behind worktree + dev-database guardrails.
+- **planning** — `spec`, `research`, `technical-plan`: read-only document-producers whose
+  verification grades grounding, testability, and completeness rather than tests.
+- **review** — `code-review`, `design-review`, `security-review`, `architecture-review`:
+  read-only findings-producers verified by adversarial re-verification (a reported finding
+  must reproduce, or it is dropped).
+- **testing** — `qa`, `e2e-regression`, `test-coverage`, `eslint-burndown`,
+  `performance-burndown`: dedicated test-health, regression, and burndown work.
+- **maintenance** — `dependency-maintenance`, `performance-burndown`: approved backlog
+  batches and fixed-recipe measurement toward one target.
+- **delivery** — `landing`, `deploy`, `canary`, `release`: approval-gated wrappers that
+  separate merge, deployment, observation/rollback, and release sign-off so one approval
+  cannot silently authorize the next risk level.
+- **meta** — `pipeline-improve`: the self-improvement pipeline that reads `memory/` and
+  proposes the next change to the loop itself.
+
+The orchestrator's routing + bookkeeping half is executable code — `orchestrator/dispatch.mjs`
+validates each inbox item against the canonical registry, emits the dispatch plan in priority
+order, and records outcomes; the Workflow runtime executes the selected pipeline. Everything
+runs on built-in primitives, so the system stays independent of external agent daemons.
+
+Each pipeline is a **template**: the methodology is generic, and stack-specific references
+defer to [`STACK.md`](./STACK.md). Adapt a pipeline's prose to your project once, then run it.

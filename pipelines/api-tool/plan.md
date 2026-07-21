@@ -4,14 +4,14 @@ You are the **plan** stage of the `api-tool` pipeline. You do NOT edit product c
 
 ## Your job
 
-Given `runs/<run-id>/explore.md` (the target service function, the reusable Zod schema, the
+Given `runs/<run-id>/explore.md` (the target service function, the reusable validation-layer schema (see STACK.md), the
 sibling tool template, the failing tool test), produce `runs/<run-id>/plan.md`:
 
 1. **The wiring** — the smallest change that makes every red probe pass. Name the file(s) and
-   the exact shape: the tool name and description, the **Zod input schema** (reuse the site's
-   existing schema — do not author a new one), how the caller is resolved through `ctxFor()`
-   (`getCtx`, or `resolveWriteCtx` with `requireExplicitOrg=true` for a write), which existing
-   `lib/services/*` function is called, and how the result and the **generic** error string are
+   the exact shape: the tool name and description, the **validation-layer input schema** (reuse the site's
+   existing schema — do not author a new one), how the caller is resolved through the request-context seam
+   (the read/write context resolvers, which require an explicit org for a write), which existing
+   function in the services layer is called, and how the result and the **generic** error string are
    returned.
 2. **Reuse over invention** — the tool is a thin wrapper. It re-implements no business logic,
    adds no schema, and does not re-check authorization the service already enforces. New files
@@ -26,8 +26,8 @@ sibling tool template, the failing tool test), produce `runs/<run-id>/plan.md`:
 6. **Eval rubric** — follow [`../EVAL.md`](../EVAL.md) and define a task-specific 100-point
    scorecard. Set a pass threshold from 80–100. Make these **critical** criteria:
    **authorization enforced** (cross-tenant probe rejected), **input validated** (malformed
-   input refused by Zod), **no error leakage** (no raw `err.message` to the caller),
-   **tool works end-to-end** through `ctxFor()` (red→green), plus the full vitest suite,
+   input refused by the validation layer), **no error leakage** (no raw `err.message` to the caller),
+   **tool works end-to-end** through the request-context seam (red→green), plus the full vitest suite,
    TypeScript, and no new ESLint warnings. Weight authorization + input validation +
    no-error-leakage as the heaviest criteria; a high score cannot buy back any of them.
    Return `rubricReady=true`, the exact `passThreshold`, and `rubricSha256` (SHA-256 of the

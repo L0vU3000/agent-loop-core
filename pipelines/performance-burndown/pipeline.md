@@ -35,8 +35,8 @@ samples. It refuses:
 - production database measurement or any write query;
 - a target whose baseline cannot be reproduced in the isolated environment.
 
-Database latency work may use `EXPLAIN (ANALYZE, BUFFERS)` only on an approved Neon development branch
-with a read-only query and fixed fixture. It never connects to production and never runs `seed:reset`.
+Database latency work may use `EXPLAIN (ANALYZE, BUFFERS)` only on an approved dev database (see STACK.md)
+with a read-only query and fixed fixture. It never connects to production and never runs a destructive seed reset.
 
 ## Exit condition
 
@@ -82,8 +82,8 @@ Every failed Eval returns its evidence to Plan before another attempt.
 - **Bounds:** at most 6 attempts, 7 agent calls per invocation, and a declared 50,000-token ceiling
   enforced through the Workflow budget when available.
 - **No progress:** stop after two consecutive rejected attempts or when Plan has no untried grounded lever.
-- **Data safety:** Neon development branch only for query work; read-only measurement; never production,
-  destructive SQL, or `seed:reset`.
+- **Data safety:** dev database only for query work; read-only measurement; never production,
+  destructive SQL, or a destructive seed reset.
 - **Memory:** append measurement landmines and rejected levers to `agent-loop/memory/errors.md`.
 
 ## Status and trigger

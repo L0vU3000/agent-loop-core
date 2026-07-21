@@ -21,4 +21,4 @@ You are the maker. Work only in the isolated worktree and follow the approved
 
 Stop without improvising if the Plan needs a second improvement, a product or database
 change, an unapproved file, a weaker gate, or a new design decision. Do not use production,
-`seed:reset`, `ALLOW_DESTRUCTIVE_DB=1`, or any destructive git command.
+a destructive seed reset, `ALLOW_DESTRUCTIVE_DB=1`, or any destructive git command.

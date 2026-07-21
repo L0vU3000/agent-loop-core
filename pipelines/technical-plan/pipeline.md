@@ -58,14 +58,14 @@ A run passes only when every check is true:
    justified against a real sibling pattern. Eval collects this evidence itself with `graphify` and
    file reads; an unresolved or invented reference is a critical failure.
 3. The plan is **complete across layers**: nothing required to ship the slice is missing. If a
-   mutation is added, its Zod validation, service query, action, UI wiring, and tests all appear;
+   mutation is added, its input validation, service query, action, UI wiring, and tests all appear;
    if the schema moves, a migration step appears.
 4. The implementation sequence is **ordered and buildable** — each step depends only on steps
    before it, and a builder could follow them top to bottom without back-tracking.
 5. In-scope and out-of-scope are both explicit; the plan covers one slice, not an epic. No
    "and more" or open-ended widening.
-6. The plan respects the codebase's standing constraints (`CLAUDE.md`): Neon + Drizzle services,
-   server-first components, Zod-validated mutations, no secrets to the client, no Convex.
+6. The plan respects the codebase's standing constraints (the project conventions doc (see STACK.md)): the database and services layer,
+   server-first components (if your framework supports it), input-validated mutations, no secrets to the client, no dead/parallel backend layer.
 7. Open decisions the owner must make (a library choice, a data-model trade-off, a UX call) are
    enumerated as open questions, not silently answered. A plan that invents an owner-only decision
    fails.
@@ -89,8 +89,8 @@ whether the plan is grounded, complete, sequenced, bounded, and honest:
 - **Buildable sequencing** — each ordered step depends only on earlier steps; a builder could
   execute them top to bottom.
 - **Boundedness** — one slice, explicit out-of-scope, no epic creep.
-- **Constraint fidelity** — the plan honors `CLAUDE.md` (Neon + Drizzle, server-first, Zod, no
-  Convex, no client secrets).
+- **Constraint fidelity** — the plan honors the project conventions doc (the database and data layer, server-first (if your framework supports it), input validation, no
+  dead/parallel backend layer, no client secrets).
 - **Honesty** — owner-only decisions appear under open questions rather than as invented answers.
 
 The maker writes the plan; a different-model, read-only verifier scores it and never rewrites it.

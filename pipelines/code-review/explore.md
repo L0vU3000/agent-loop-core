@@ -20,9 +20,10 @@ edit product source. Your only write is `runs/<run-id>/explore.md`.
 4. Map the change so the review can be grounded. Use `graphify query`/`path` to orient before
    reading source, then record: the changed files and their role (service, action, component,
    schema, derivation), the functions/exports touched, the callers and data that flow through
-   them, and the standing `CLAUDE.md` constraints that apply (Neon + Drizzle services,
-   server-first components, Zod-validated mutations, authz + ownership on mutations, no client
-   secrets, no Convex). Record exact file paths — the review and Eval will cite them.
+   them, and the standing constraints in the project conventions doc (see STACK.md) that apply
+   (the services layer, server-first components (if your framework supports it), input-validated
+   mutations, authz + ownership on mutations, no client secrets, no dead/parallel backend layer).
+   Record exact file paths — the review and Eval will cite them.
 5. Decide the downstream building `type` a confirmed high-severity finding would resolve to
    (usually `bug`, sometimes `feature` for a reuse/cleanup slice). The maker drafts that ticket
    `approved: false`.

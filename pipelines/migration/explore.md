@@ -9,10 +9,10 @@ Your only edits are the focused assertion file and `runs/<run-id>/explore.md`.
    and a complete, single, additive change against one existing table. Refuse ambiguity; do not
    infer fields from UI copy.
 2. Run `graphify query` for the target table and its closest sibling migrations. Confirm the
-   current pattern in: `lib/db/schema/`, `lib/db/migrations/` (including the journal and the
-   latest `when` timestamp), `lib/data/types/` if the field is exposed, `scripts/schema-assert.ts`,
+   current pattern in: the schema directory (see STACK.md), `lib/db/migrations/` (including the journal and the
+   latest `when` timestamp), the shared types directory if the field is exposed, `scripts/schema-assert.ts`,
    and any existing `*.db.test.ts` that already touches the table.
-3. Confirm the database URL targets the approved development Neon branch before any later write.
+3. Confirm the database URL targets the approved dev database before any later write.
    Record only the endpoint/branch identity, never credentials.
 4. Record baseline results for the whole Vitest suite, TypeScript, the ESLint warning count, and
    `npm run db:check` (capture its exact output — this repo has an accepted pre-existing 0008/0011

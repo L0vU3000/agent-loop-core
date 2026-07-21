@@ -14,8 +14,8 @@ judge whether it works — that's the `eval` stage (a separate agent).
 
 ## Rules
 
-- If the feature touches data, use the **Neon dev branch** — never prod, never `seed:reset`.
+- If the feature touches data, use **the dev database (see STACK.md)** — never prod, never run a destructive seed reset.
 - No dev-framing words in user-facing copy (no "beta", "placeholder", "simply" — see
-  `vault/resources/words-to-avoid.md`).
+  STACK.md).
 - Hand off to `eval`. Do not run the suite and declare success — the verifier is separate
   on purpose.

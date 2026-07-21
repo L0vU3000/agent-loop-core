@@ -74,7 +74,7 @@ type in a temporary copy and requires a failure before restoring the matching me
   with the same run ID plus `--approved-plan`.
 - **Verification:** Execute uses `opus`; Eval uses `sonnet`. Eval is read-only and does not
   suggest repairs.
-- **Database:** no database changes or writes. Never use production, `seed:reset`, or
+- **Database:** no database changes or writes. Never use production, a destructive seed reset, or
   `ALLOW_DESTRUCTIVE_DB=1`.
 - **Bounds:** at most 3 recorded attempts, 45 minutes of call-launch time, 8 agent calls per
   invocation, and a declared 45,000-token ceiling.

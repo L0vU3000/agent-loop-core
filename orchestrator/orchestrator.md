@@ -52,7 +52,7 @@ pipelines. Today:
 | `building` | `entity` | [`pipelines/entity-scaffold`](../pipelines/entity-scaffold/pipeline.md) | approved contract red→green, additive migration, tenant-safe live CRUD test, global gates clean |
 | `building` | `wiring` | [`pipelines/wiring`](../pipelines/wiring/pipeline.md) | every in-scope value traces to a real schema field/derivation, no mocks remain, surface renders, gates clean |
 | `building` | `migration` | [`pipelines/migration`](../pipelines/migration/pipeline.md) | one additive migration applied on a dev branch, schema-assert green, `db:check` no-new-collision, gates clean |
-| `building` | `api-tool` | [`pipelines/api-tool`](../pipelines/api-tool/pipeline.md) | tool wraps an existing service via `ctxFor`, authz enforced + input validated + no error leak, gates clean |
+| `building` | `api-tool` | [`pipelines/api-tool`](../pipelines/api-tool/pipeline.md) | tool wraps an existing service via the request-context seam, authz enforced + input validated + no error leak, gates clean |
 | `testing` | `test` | [`pipelines/test-coverage`](../pipelines/test-coverage/pipeline.md) | new tests pass, module coverage strictly ↑, Stryker mutation score ≥ threshold, gates clean |
 | `testing` | `qa` | [`pipelines/qa`](../pipelines/qa/pipeline.md) | all in-scope flows re-driven green in a fresh browser session, 0 console errors, gates clean |
 | `testing` | `e2e` | [`pipelines/e2e-regression`](../pipelines/e2e-regression/pipeline.md) | e2e suite green ×2 consecutive, every failure fixed or quarantined+ticketed, gates clean |
@@ -102,8 +102,8 @@ select among pipelines within the supplied category; the current router requires
 
 - **Isolation:** every dispatched pipeline runs in its **own git worktree** — never on the
   live branch, never two pipelines in the same tree.
-- **Data safety:** any pipeline that writes data uses a **Neon dev branch**, never prod,
-  and **never `seed:reset`**.
+- **Data safety:** any pipeline that writes data uses a **dev database** (see STACK.md), never prod,
+  and **never runs a destructive seed reset**.
 - **Bounded:** the router honors each pipeline's max-iterations / max-time. No open-ended runs.
 - **Human at the two constraints:** you review the *plan* (start) and the *result* (end).
   Slide those inward only as a pipeline earns trust.

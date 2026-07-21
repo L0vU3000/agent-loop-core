@@ -14,12 +14,12 @@ ship.
 1. **The tool test passes** — the one `explore` wrote (red at first, must now be green).
    Confirm it is the same test, unmodified, and it passes *because the tool exists and works*,
    not because it was weakened.
-2. **Wraps the real service via `ctxFor()`** — read the diff: the tool resolves its Ctx through
-   `ctxFor()`/`getCtx` and calls an **existing** `lib/services/*` function. It adds no new
+2. **Wraps the real service via the request-context seam** — read the diff: the tool resolves its Ctx through
+   the read/write context resolvers and calls an **existing** function in the services layer (see STACK.md). It adds no new
    business logic and no schema. A tool that inlines its own logic is a **fail**.
 3. **Authorization enforced** — the cross-tenant / wrong-org probe is **rejected**, through the
    service's own guards (not bypassed, not re-implemented, no guessed org for a write).
-4. **Input validated** — malformed input is **refused by Zod** before any DB work.
+4. **Input validated** — malformed input is **refused by the validation layer** before any DB work.
 5. **No error leakage** — the tool returns a generic message and logs detail internally; no raw
    `err.message` reaches the caller.
 6. `npx vitest run` → the **whole** suite green.
@@ -37,9 +37,9 @@ threshold: <planned>/100
 critical-failures: <count>
 rubric-valid: yes/no
 tool-test: <path> — red→green? yes/no
-ctxFor-wrap: yes/no (calls existing service, no new logic)
+context-seam-wrap: yes/no (calls existing service, no new logic)
 authz:   cross-tenant call rejected? yes/no
-input:   malformed input refused by Zod? yes/no
+input:   malformed input refused by the validation layer? yes/no
 no-leak: raw err.message hidden? yes/no
 suite:   <passed>/<total>
 tsc:     <error-count>

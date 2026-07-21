@@ -6,7 +6,7 @@ whether it worked — that's the `eval` stage (a separate agent).
 ## Your job
 
 1. Wire exactly what `runs/<run-id>/plan.md` describes — smallest form. Replace each in-scope
-   mock/placeholder/hardcoded literal with the real value read from `lib/services/*` and
+   mock/placeholder/hardcoded literal with the real value read from the services layer (see STACK.md) and
    threaded through the Server Action / Server Component named in the plan.
 2. Do **not** modify the traceability assertions to make them pass. The assertions are the
    pin; the wiring must meet them, not the other way around.
@@ -19,7 +19,7 @@ whether it worked — that's the `eval` stage (a separate agent).
 
 ## Rules
 
-- Wire reads through the **Neon dev branch** — never prod, never `seed:reset`.
+- Wire reads through the **dev database** — never prod, never run a destructive seed reset.
 - Select only the fields the surface renders; never pass a full DB object as a prop, and never
   expose a secret to a Client Component.
 - No dev-framing words in user-facing copy (no "beta", "placeholder", "simply" — see

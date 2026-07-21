@@ -18,7 +18,7 @@ Write `runs/<run-id>/explore.md` with:
 6. Repository baselines: `npx vitest run`, `npx tsc --noEmit`, and
    `npx eslint app lib components` with raw exit codes and warning count.
 7. The current git commit, isolated-worktree confirmation, and for query work, proof that the endpoint is
-   an approved Neon development branch and the query is read-only.
+   an approved dev database (see STACK.md) and the query is read-only.
 8. A short list of grounded levers from profiler, trace, bundle, query-plan, or source evidence. Do not
    invent a bottleneck from the metric alone.
 

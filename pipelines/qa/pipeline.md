@@ -68,24 +68,23 @@ Recorded in [`memory/decisions.md`](../../memory/decisions.md).
 
 ## App under test
 
-- Server: `npm run dev:e2e` — the DEMO_MODE owner session on port **3001**. Port 3002 is
-  reserved for the separate real-Clerk auth project. Reuse a server that's already up;
+- Server: the e2e dev-server command (see STACK.md) — the app's demo/seed session mode on the dev server port. A second port for the auth run is
+  reserved for the separate real-auth-provider project. Reuse a server that's already up;
   start one if not.
 - **Never `networkidle`** waits against the dev server (known hang); wait on selectors.
 - **Reuse the shared browser fixture behavior in `e2e/fixtures.ts`:** block
-  `**clerk.accounts.dev/**`, set `window.__E2E__ = true`, and inject its Clerk-overlay CSS.
-  The blocked hosted Clerk request is expected test-rig noise. Do not add broader ignore
+  the hosted auth-provider sign-in requests, set the app's e2e hook flag, and inject its auth-provider-overlay CSS.
+  The blocked hosted auth-provider request is expected test-rig noise. Do not add broader ignore
   rules for ordinary product requests or console errors.
-- Data: the app points at the **Neon dev branch** (`.env.local`). Flows that create rows use
+- Data: the app points at the **dev database** (the dev environment config). Flows that create rows use
   recognizable names (`QA-PIPELINE-*`) and clean up after themselves where a delete surface
-  exists. Never prod, **never `seed:reset`**.
+  exists. Never prod, **never run a destructive seed reset**.
 
 ## Default route scope (a ticket can override)
 
-`/` · `/property/PROP-0001/overview` · `/property/PROP-0001/documents` ·
-`/property/PROP-0001/ownership` · `/settings` · `/add-property` through the import-method
-step · the ownership wizard through its loaded structure step (regression: co-owner
-data-loss). A ticket can supply a different valid seed property ID.
+Your app's key routes (list them in STACK.md), e.g. an entity overview, a detail tab, a
+settings page, and an entity-creation flow through its first meaningful step, plus any flow
+with a known regression to guard. A ticket can supply a different valid seed entity id.
 
 ## Guardrails
 

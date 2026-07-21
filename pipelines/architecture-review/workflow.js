@@ -1,7 +1,7 @@
 // architecture-review — automated pipeline runtime (built-in Workflow, no external deps).
 // Review category: inspect the structure of an existing subsystem/module (or the whole repo) and
 // produce verified, evidence-backed findings — layering violations, tight coupling, dependency
-// cycles, drift from CLAUDE.md's architecture rules, and dead/parallel code — looped
+// cycles, drift from the architecture rules in the project conventions doc (see STACK.md), and dead/parallel code — looped
 // explore → plan → execute → eval until the review scores at or above the locked threshold with no
 // critical failures. Read-only on the product — the only writes are the findings report + drafted
 // `approved: false` refactor tickets under runs/<run-id>/. No worktree, no database branch, no
@@ -80,7 +80,7 @@ const frame = await agent(
    Apply the scope gate: accept only a request to REVIEW the STRUCTURE of an existing subsystem,
    module, or the whole repo that resolves against the codebase. Resolve exactly which files and
    modules the review covers, then map the region's dependency edges, the layering rules from
-   CLAUDE.md it must respect, and any dead/parallel code (e.g. the archived Convex layer). Return
+   the project conventions doc it must respect, and any dead/parallel code (e.g. an archived or parallel backend layer). Return
    accepted, runId, the downstream building targetType a confirmed high-severity finding resolves
    to, and the reviewTarget. If the request is a build/refactor job, a line-level correctness
    review (→ code-review), a security audit (→ security-review), a visual critique (→
@@ -134,7 +134,7 @@ while (i < MAX) {
      \`${P}/runs/${RUN}/\`. Review the STRUCTURE of only the in-scope files/modules with
      \`graphify\` (query/path/explain, GRAPH_REPORT.md) plus reading, then write the findings report
      (findings.md) — each finding severity · location (file:line or module) · cited evidence (the
-     exact rule from CLAUDE.md or the dependency edge it violates) · why it matters, most-severe
+     exact rule from the project conventions doc or the dependency edge it violates) · why it matters, most-severe
      first — and the drafted refactor tickets (proposed-tickets.md, \`approved: false\`) for each
      confirmed high-severity finding. Ground every finding in a real file/module and a named rule
      or dependency edge; a false positive is worse than a miss — report zero findings if the
@@ -146,7 +146,7 @@ while (i < MAX) {
     `You are the EVAL stage (VERIFIER — a DIFFERENT agent from the maker). Follow ${P}/eval.md.
      Write your verdict to \`${P}/runs/${RUN}/eval.md\`. Adversarially re-verify EVERY reported
      finding: independently substantiate it with \`graphify path\`/\`query\` and file reads —
-     confirm the cited dependency edge actually exists and the cited CLAUDE.md rule actually applies
+     confirm the cited dependency edge actually exists and the cited project-conventions-doc rule actually applies
      to the cited code. DROP any finding you cannot substantiate or that misreads the structure (a
      surviving false positive is a critical failure), then confirm each survivor's evidence
      resolves, severity matches the definitions, and the declared scope matches the subsystem

@@ -9,7 +9,7 @@
 
 export const meta = {
   name: 'wiring',
-  description: 'Replace mock/placeholder/hardcoded values on one surface with real data wired from lib/services, pinned by red-to-green traceability assertions',
+  description: 'Replace mock/placeholder/hardcoded values on one surface with real data wired from the services layer, pinned by red-to-green traceability assertions',
   phases: [{ title: 'Pin' }, { title: 'Wire loop' }],
 }
 
@@ -101,7 +101,7 @@ while (i < MAX) {
      In-scope values: ${spec.values}. Failing assertions: ${spec.assertionPath}.
      ${last ? `Previous attempt failed: ${last}. Adjust.` : ''}
      Plan the smallest wiring that turns every traceability assertion green (each value read
-     from lib/services through a Server Action/Component). Add no new schema. Create the
+     from the services layer through a Server Action/Component). Add no new schema. Create the
      task-specific 100-point Eval rubric required by plan.md. Hash the exact Eval-rubric section
      with SHA-256 and return rubricReady, passThreshold, and rubricSha256. On retries, keep that
      section byte-for-byte unchanged unless a human approved a rubric change.`,
@@ -123,7 +123,7 @@ while (i < MAX) {
   await agent(
     `You are the EXECUTE stage (MAKER). Follow ${P}/execute.md. Write only into
      \`${P}/runs/${RUN}/\`. Wire exactly what the plan describes — replace each mock/placeholder/
-     hardcoded literal with the real value from lib/services. Add NO new schema. Do NOT modify
+     hardcoded literal with the real value from the services layer. Add NO new schema. Do NOT modify
      the traceability assertions to make them pass. If the plan is wrong, stop and report —
      don't improvise.`,
     { label: `execute#${i}`, phase: 'Wire loop', ...TIER.make })

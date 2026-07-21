@@ -54,10 +54,10 @@ Recorded in [`memory/decisions.md`](../../memory/decisions.md).
 ## Running the suite (the landmines — from memory `project_e2e_suite`)
 
 - Runner needs **Node ≥ 24** (Node 22 + Playwright loader bug).
-- Server: `npm run dev:e2e` (DEMO_MODE owner session), `workers: 1`.
+- Server: the e2e dev-server command (see STACK.md) (the app's demo/seed session mode), `workers: 1`.
 - Never `networkidle` waits against the dev server.
-- **Never `seed:reset`.** The app points at the Neon dev branch.
-- The real-Clerk `auth` project (`npm run test:e2e:auth`, port 3002) is a separate, slower
+- **Never run a destructive seed reset.** The app points at the dev database (see STACK.md).
+- The real auth-provider `auth` project (the auth e2e command (see STACK.md), a second port for the auth run) is a separate, slower
   lane — only in scope when the ticket asks for it.
 
 ## Stages

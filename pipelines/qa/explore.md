@@ -5,15 +5,15 @@ user does and record what's broken — not to fix anything.
 
 ## Your job
 
-1. **Get the app up** — reuse a running dev server if one answers on port 3001; otherwise
-   start `npm run dev:e2e` (DEMO_MODE owner session). In an isolated worktree install
+1. **Get the app up** — reuse a running dev server if one answers on the dev server port; otherwise
+   start the e2e dev-server command (see STACK.md) (the app's demo/seed session mode). In an isolated worktree install
    physical dependencies with `npm ci --ignore-scripts`; do not symlink `node_modules`
    across the worktree boundary. Never use `networkidle` waits against the dev server —
    wait on concrete selectors.
 2. **Drive the in-scope routes** (the ticket's list, else the default scope in
    `pipeline.md`). For each route/flow, using the Playwright browser tools:
-   - reproduce the shared `e2e/fixtures.ts` setup: block `**clerk.accounts.dev/**`, set
-     `window.__E2E__ = true`, and inject its Clerk-overlay CSS;
+   - reproduce the shared `e2e/fixtures.ts` setup: block the hosted auth-provider (see STACK.md) sign-in requests, set
+     the app's e2e hook flag, and inject its auth-provider-overlay CSS;
    - navigate, wait for the page's key landmark, take an accessibility snapshot;
    - exercise the flow's core interactions (open the wizard, click through steps, submit
      where the flow is meant to submit);
@@ -28,9 +28,9 @@ user does and record what's broken — not to fix anything.
 
 - Read-only on product code. You write only run notes.
 - Data safety: flows that create rows use `QA-PIPELINE-*` names; don't delete or edit seed
-  rows; the app must be on the Neon dev branch (check `.env.local` — never prod
-  `ep-aged-cloud-*`), never `seed:reset`.
+  rows; the app must be on the dev database (check the dev environment config — never the prod
+  endpoint, whose id is in STACK.md), never run a destructive seed reset.
 - Evidence over vibes: a finding without a console message, failed request, or missing
   landmark isn't a finding.
-- Report deliberately blocked Clerk requests in a separate test-rig-noise section. Never
+- Report deliberately blocked auth-provider requests in a separate test-rig-noise section. Never
   use a broad console/network filter to make a route appear clean.

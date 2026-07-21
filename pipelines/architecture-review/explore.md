@@ -12,7 +12,7 @@ do not edit product source. Your only write is `runs/<run-id>/explore.md`.
    `security-review`); a visual/UX critique (→ `design-review`); or a target that names no
    resolvable subsystem (→ ask for a real region to review).
 2. **Confirm the target resolves.** Identify exactly which files and modules the named subsystem
-   covers (a directory such as `lib/services/*`, a feature area such as add-property, or the whole
+   covers (a directory such as the services layer (see STACK.md), a feature area such as add-property, or the whole
    repo). If the target does not resolve to real code, refuse.
 3. Mint ONE run-id: `date "+%Y-%m-%d-%H%M%S"`, then `mkdir -p runs/<run-id>`. Every later stage
    uses it.
@@ -22,21 +22,21 @@ do not edit product source. Your only write is `runs/<run-id>/explore.md`.
      schema, derivation);
    - the **dependency edges** between them — especially any edge that crosses a layer boundary the
      rules forbid (a component or route handler reaching the database directly instead of through
-     `lib/services/*`, business logic living in a route handler, `useEffect` for an initial data
+     the services layer, business logic living in a route handler, `useEffect` for an initial data
      load, a client component importing a server-only secret);
    - any **dependency cycles** the graph reveals;
-   - **dead or parallel code** in scope — most notably the archived `archive/convex/` layer the app
+   - **dead or parallel code** in scope — most notably a dead or parallel backend layer the app
      does not call, and any other unreachable or duplicated module;
-   - the standing `CLAUDE.md` architecture rules that apply (default to Server Components; fetch in
-     Server Components, never `useEffect` for initial loads; one action file per domain; Server
-     Actions → `lib/services/*` for anything touching the DB; Neon + Drizzle, not Convex; no secrets
+   - the standing architecture rules in the project conventions doc that apply (default to server-first
+     rendering, if your framework supports it; fetch on the server, never `useEffect` for initial loads; one action file per domain; server
+     actions → the services layer for anything touching the DB; the database and data layer, not a dead/parallel backend; no secrets
      to the client). Record exact file paths and the rule text — the review and Eval will cite them.
 5. Decide the downstream building `type` a confirmed high-severity finding would resolve to (usually
    `wiring` or `feature` for a structural repair, sometimes `bug` when the violation causes a
    concrete fault). The maker drafts that ticket `approved: false`.
 6. Write `runs/<run-id>/explore.md` with the scope verdict, the resolved review scope (the exact
    files/modules under review, so Eval can check coverage), the structure map (dependency edges,
-   cycles, dead/parallel code, and the layer of each in-scope file), the applicable `CLAUDE.md`
+   cycles, dead/parallel code, and the layer of each in-scope file), the applicable project-conventions-doc
    rules, the downstream target type, and the constraints the review must judge against.
 
 ## Refuse fast

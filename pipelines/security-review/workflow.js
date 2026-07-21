@@ -2,11 +2,11 @@
 // Review category: inspect one existing change (a branch, diff, or PR) for security
 // vulnerabilities against this repo's own security rules and produce verified, evidence-backed
 // findings — missing authN/authZ, IDOR/ownership, unvalidated input, err.message leakage,
-// NEXT_PUBLIC_/prop secret exposure, missing rate limiting, full-DB-object props — looped
+// a client-bundled/public env prefix (e.g. `NEXT_PUBLIC_`) or prop secret exposure, missing rate limiting, full-DB-object props — looped
 // explore → plan → execute → eval until the review scores at or above the locked threshold with no
 // critical failures. Read-only on the product — the only writes are the findings report + drafted
 // `approved: false` fix tickets under runs/<run-id>/. No worktree, no database branch, no lint.
-// Authorized defensive review of the Valgate codebase only; no reusable exploit is produced.
+// Authorized defensive review of the app's codebase only; no reusable exploit is produced.
 // maker (execute) != verifier (eval); eval on a different model. The verifier adversarially
 // re-verifies every reported vulnerability and DROPS any it cannot stand up. One runId is minted
 // once and threaded through every stage (memory/errors.md).
@@ -81,12 +81,12 @@ const frame = await agent(
    to REVIEW an existing change that names a real branch/diff/PR with an actual diff, for security
    vulnerabilities in THIS codebase (authorized defensive review only). Resolve the base/head and
    record the exact files and hunks in scope, then map the change against the attack surface
-   (mutations, data reads, authN/authZ, input validation, error returns, NEXT_PUBLIC_/prop secrets,
-   rate limiting) and the CLAUDE.md Security Rules each touchpoint must satisfy. Return accepted,
+   (mutations, data reads, authN/authZ, input validation, error returns, a public env prefix or prop secrets,
+   rate limiting) and the Security Rules in the project conventions doc (see STACK.md) each touchpoint must satisfy. Return accepted,
    runId, the downstream building targetType a confirmed high-severity finding resolves to, and the
    reviewTarget. If the request is a build/fix job, a correctness review (→ code-review), a structure
    audit (→ architecture-review), a design critique (→ design-review), a target with no diff, or an
-   offensive/non-Valgate request, set accepted=false and explain in note — do not invent a change to
+   offensive/non-project request, set accepted=false and explain in note — do not invent a change to
    review.`,
   { label: 'explore', schema: FRAME, ...TIER.read })
 
@@ -135,11 +135,11 @@ while (i < MAX) {
   await agent(
     `You are the EXECUTE stage (MAKER). Follow ${P}/execute.md. Write only into
      \`${P}/runs/${RUN}/\`. Review only the in-scope files/hunks with the /cso and /security-review
-     skills, checking each against the applicable CLAUDE.md Security Rules, then write the findings
+     skills, checking each against the applicable Security Rules in the project conventions doc, then write the findings
      report (findings.md) — each finding severity · location (file:line) · cited vulnerable code ·
      concrete exploit/impact · why it matters, most-severe first — and the drafted fix tickets
      (proposed-tickets.md, \`approved: false\`) for each confirmed high-severity finding. Confirm the
-     guard is genuinely absent (no shared ownership helper, Zod schema, or select projection already
+     guard is genuinely absent (no shared ownership helper, input-validation schema, or select projection already
      closes it) before reporting; a false positive is worse than a miss — report zero findings if the
      change is clean. This is defensive review: document vulnerabilities, do NOT write a reusable
      exploit. Do NOT edit product source, schema, or the live orchestrator inbox. If the plan's scope
@@ -151,7 +151,7 @@ while (i < MAX) {
      Write your verdict to \`${P}/runs/${RUN}/eval.md\`. Adversarially re-verify EVERY reported
      vulnerability: independently trace its unauthorized path or re-read the cited file:line with
      \`graphify\` and file reads to confirm the code really is unsafe as claimed, and check that no
-     upstream guard (shared ownership helper, Zod parse, select projection) already closes it. DROP
+     upstream guard (shared ownership helper, input validation, select projection) already closes it. DROP
      any finding you cannot stand up (a surviving false positive is a critical failure), then confirm
      evidence resolves with a concrete exploit, severity matches the definitions, and the declared
      scope + rule coverage match the target's actual diff. Apply the locked rubric at SHA-256

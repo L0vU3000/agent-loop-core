@@ -5,13 +5,13 @@ You are the maker. Work only in the isolated worktree and follow the approved
 
 ## Phase A — Update the schema and hand-author the migration
 
-1. Update the target Drizzle table definition to add exactly the approved column, index, enum
+1. Update the target schema definition (see STACK.md) to add exactly the approved column, index, enum
    value, or constraint. Keep the table's tenant columns (`orgId`, `userId`, `propertyId`)
-   non-null. When the change is exposed to the app, update the Zod field to match.
-2. Hand-author the SQL migration under `lib/db/migrations/`. `drizzle-kit generate` is broken
-   here — write the SQL yourself. Give it a `when` timestamp monotonically greater than the
-   latest journal entry recorded by Explore, and add its journal entry, or drizzle will silently
-   skip it. The SQL must be additive: no `DROP`, `TRUNCATE`, rename, type narrowing, or
+   non-null. When the change is exposed to the app, update the validation-layer field to match.
+2. Hand-author the SQL migration under `lib/db/migrations/`. The migration tool's generate step is
+   broken here — write the SQL yourself. Give it a `when` timestamp monotonically greater than the
+   latest journal entry recorded by Explore, and add its journal entry, or the migration tool will
+   silently skip it. The SQL must be additive: no `DROP`, `TRUNCATE`, rename, type narrowing, or
    data-losing rewrite. Include the approved additive backfill only as a fill-only `UPDATE`.
 3. Update `scripts/schema-assert.ts` so its inventory names the new schema object.
 4. Inspect the SQL before any application. Stop if it contains changes outside the approved
@@ -31,7 +31,7 @@ Run this phase only when the workflow supplies both `--approved-plan` and
    digest. It must equal the digest presented for approval.
 3. Apply it with `npm run db:migrate` (idempotent — an already-applied result at the same
    digest is success, not failure), run `npm run db:assert`, run the approved backfill if any,
-   and recheck the live schema for the new object. Never use production, `seed:reset`, or
+   and recheck the live schema for the new object. Never use production, a destructive seed reset, or
    `ALLOW_DESTRUCTIVE_DB=1`.
 4. Append the attempt number, commands, and outcomes to `runs/<run-id>/execute.md`.
 

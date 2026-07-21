@@ -18,15 +18,16 @@ objective; the owner still approves whether it is the right architecture to comm
    real sibling the plan names. An unresolved or invented reference is a critical failure.
 3. **Layer completeness (critical)** — walk the data → service → action → UI → tests →
    migration chain. Confirm nothing required to ship the slice is missing: a new mutation carries
-   its Zod validation, service query, action, UI wiring, and tests; a schema change carries a
+   its input validation, service query, action, UI wiring, and tests; a schema change carries a
    migration step. A gap in the chain is a critical failure.
 4. **Buildable sequencing (critical)** — read the implementation sequence in order and confirm each
    step depends only on steps before it, with no forward references. A builder must be able to
    follow it top to bottom without back-tracking.
 5. **Bounded scope (critical)** — one slice; in-scope and out-of-scope both explicit; no epic
    creep, and no widening past the approved spec.
-6. **Constraints respected** — the plan honors `CLAUDE.md` (Neon + Drizzle services, server-first,
-   Zod-validated mutations, no Convex, no client secrets).
+6. **Constraints respected** — the plan honors the project conventions doc (see STACK.md) (the
+   database and services layer, server-first (if your framework supports it), input-validated
+   mutations, no dead/parallel backend layer, no client secrets).
 7. **Honest open questions** — every unmade owner decision is listed under open questions, not
    answered by invention.
 

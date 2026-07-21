@@ -13,7 +13,7 @@ NOT judge whether they're good enough — that's the `eval` stage (a separate ag
    stop and record why in `runs/<run-id>/execute.md` — that's a finding for the plan stage,
    not a license to refactor.
 4. Live-DB lane only: rows you create carry the planned recognizable id prefix and are
-   deleted in `afterEach`/`afterAll` — even when assertions fail. Never `seed:reset`,
+   deleted in `afterEach`/`afterAll` — even when assertions fail. Never run a destructive seed reset,
    never touch seed rows.
 5. Record what you wrote (files, test names, anything that deviated from the plan) to
    `runs/<run-id>/execute.md`.

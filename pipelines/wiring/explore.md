@@ -11,8 +11,8 @@ assertions that fail now — not to do the wiring.
    every rendered value that is mock, placeholder, or hardcoded (a literal, a dummy number,
    an invented label). These are the values in scope.
 2. **Find each value's home** — for every in-scope value, locate the real schema field
-   (`lib/db/schema/*`) or the named derivation that should supply it, reachable through a
-   `lib/services/*` module and a Server Action / Server Component. Record the field or
+   (in the schema directory, see STACK.md) or the named derivation that should supply it, reachable through a
+   services-layer module and a Server Action / Server Component. Record the field or
    derivation for each value.
 3. **Apply the scope gate** — refuse and report (set `scoped=false`) when:
    - a value has **no backing field or derivation that exists yet** → route to `entity` or

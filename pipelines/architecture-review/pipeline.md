@@ -103,7 +103,7 @@ is a different-model, read-only verifier.
 - **Explore:** classify the request against the scope gate, confirm the target subsystem resolves,
   and map the structure — the in-scope files and modules, the dependency edges between them (via
   `graphify`), the standing `CLAUDE.md` layering rules the region must respect, and any dead or
-  parallel code (e.g. the archived Convex layer). Record the review scope so Eval can check coverage.
+  parallel code (e.g. an archived or parallel backend layer). Record the review scope so Eval can check coverage.
 - **Plan:** decide the review's scope boundaries and the severity definitions for this structure,
   name the downstream building type a confirmed high-severity finding would resolve to, and author
   the task-specific 100-point Eval rubric. Findings-verified, no-false-positives, evidence-cited,

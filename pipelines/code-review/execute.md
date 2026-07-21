@@ -11,7 +11,7 @@ Review only the files and hunks the plan named as in scope. Use `graphify query`
 before reading source. Hunt for two classes of issue:
 
 - **Correctness bugs** — wrong output, crash, data loss, broken authorization or ownership, unhandled
-  edge cases, incorrect state, race conditions, misuse of the Neon + Drizzle services layer.
+  edge cases, incorrect state, race conditions, misuse of the services layer (see STACK.md).
 - **Reuse / simplification / efficiency cleanups** — duplicated logic that a helper already covers,
   needless complexity, redundant queries or renders, work that could reuse an existing service.
 

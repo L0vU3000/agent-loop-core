@@ -33,7 +33,7 @@ The loop stops when warnings hit 0 (or all-intentional), or on `max-iterations` 
 ## Guardrails
 
 - **Isolation:** run in a git worktree; this pipeline edits code only. **No DB access** —
-  lint fixes never touch Neon.
+  lint fixes never touch the database (see STACK.md).
 - **Bounds:** `max-iterations: 8`, `max-time: 45m` (tune after the first real run).
 - **Scope:** only `@typescript-eslint/no-unused-vars`-class and other warnings surfaced by
   the lint command. Do **not** refactor logic to satisfy a warning — if a fix isn't

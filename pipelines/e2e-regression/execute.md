@@ -17,6 +17,6 @@ NOT judge whether it worked — that's the `eval` stage (a separate agent).
 
 - Never delete a test. Never widen a timeout or add a retry to make a regression "pass" —
   that's flake-masking, and eval diffs for it.
-- Never `seed:reset`; the app stays on the Neon dev branch.
+- Never run a destructive seed reset; the app stays on the dev database (see STACK.md).
 - Hand off to `eval`. Do not rerun the suite and declare success — the verifier is separate
   on purpose.

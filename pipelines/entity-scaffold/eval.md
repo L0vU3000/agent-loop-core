@@ -12,8 +12,8 @@ backend schema and touches a development database.
 1. Re-read the ticket, Explore notes, and approved Plan. Fail on any invented or omitted field.
 2. Confirm the focused tests are unchanged from Explore and went red → green for the intended reason.
 3. Inspect the layers:
-   - Zod domain/new/patch schemas agree;
-   - Drizzle columns, FKs, indexes, timestamps, enums, and optionality match;
+   - validation-layer domain/new/patch schemas agree (see STACK.md);
+   - the schema definition's columns, FKs, indexes, timestamps, enums, and optionality match;
    - every service read and mutation is org-scoped, and parent-property authorization rejects
      cross-organization `propertyId` values on create or reassignment;
    - actions validate, authenticate, authorize through the service, hide internal errors, and bust cache;
@@ -23,11 +23,11 @@ backend schema and touches a development database.
    **relative to the Explore baseline**, the same way ESLint is graded: the migration passes
    only when (a) the manual additive/non-destructive inspection above passes, and (b) `db:check`
    shows no *new* collision versus Explore's recorded baseline. This repo carries a pre-existing,
-   accepted `drizzle-kit` snapshot collision (0008/0011) that aborts `db:check` upstream of any
-   new migration and gives no signal about it (see `vault/decisions/drizzle-only-hand-authored-migrations.md`);
+   accepted migration-tool snapshot collision (0008/0011) that aborts `db:check` upstream of any
+   new migration and gives no signal about it (see STACK.md);
    an unchanged baseline failure is not this run's failure, but any *new* collision the migration
    introduces is.
-5. Confirm the endpoint is the approved development branch, then run the focused live-DB test.
+5. Confirm the endpoint is the approved dev database, then run the focused live-DB test.
    Require create/list/get/update/delete, property filtering, cross-org parent rejection and
    row denial, conversion, and cleanup evidence.
 6. Run `npx vitest run`, `npx tsc --noEmit`, and `npx eslint app lib components`. ESLint may

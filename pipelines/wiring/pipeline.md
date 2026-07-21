@@ -8,7 +8,7 @@ type: wiring
 
 > **Building pipeline — make what's shown real.** Takes one named surface that displays
 > mock, placeholder, or hardcoded values and replaces every in-scope value with real data
-> wired from the Neon (Drizzle) services layer (`lib/services/*`) through Server Actions and
+> wired from the services layer (see STACK.md) through Server Actions and
 > Server Components. The product's UI Design Standard is the contract: every displayed value
 > must trace to a real schema field or a named derivation — no UI-only invented state. The
 > sibling of `feature`: same four stages, same rigor. The difference is that `explore` pins
@@ -79,8 +79,8 @@ carries invented state.
 ## Guardrails
 
 - **Isolation:** run in a git worktree (the maker edits component ↔ service/action wiring).
-- **Data safety:** wire reads through the **Neon dev branch** — never prod, **never
-  `seed:reset`** (it destroys evolved seed data).
+- **Data safety:** wire reads through the **dev database** — never prod, **never run
+  a destructive seed reset** (it destroys evolved seed data).
 - **The assertion is the pin:** `execute` must not edit the traceability assertions to make
   them pass.
 - **No new schema:** wiring reads existing fields/derivations only. If a value needs a field

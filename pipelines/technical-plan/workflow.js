@@ -60,7 +60,7 @@ const VERDICT = { type: 'object',
     layersComplete: { type: 'boolean' },       // every layer needed to ship is covered (data → service → action → UI → tests → migration)
     sequenced: { type: 'boolean' },            // steps are ordered and buildable, each on the last
     scopeBounded: { type: 'boolean' },         // one slice; explicit out-of-scope; no epic creep
-    constraintsRespected: { type: 'boolean' }, // plan honors CLAUDE.md standing constraints
+    constraintsRespected: { type: 'boolean' }, // plan honors the standing constraints in the project conventions doc (see STACK.md)
     openQuestionsListed: { type: 'boolean' },  // owner-only decisions surfaced, not invented
     evidence: { type: 'string' },
     reason: { type: 'string' },
@@ -140,7 +140,7 @@ while (i < MAX) {
      action, route, and table the plan cites with \`graphify\` and file reads (an unresolved or
      invented reference is a critical failure), confirm every layer needed to ship is covered,
      confirm the steps are ordered and each is buildable on the last, confirm scope is one bounded
-     slice with explicit out-of-scope, confirm the plan honors CLAUDE.md, and confirm owner-only
+     slice with explicit out-of-scope, confirm the plan honors the project conventions doc, and confirm owner-only
      decisions are listed as open questions rather than invented. Apply the locked rubric at SHA-256
      ${lockedRubricSha256} and threshold ${lockedPassThreshold}/100. Return score, passThreshold,
      criticalFailures, rubricValid, rubricSha256, and the section booleans.`,

@@ -90,7 +90,7 @@ if (!plan.registryOk) {
     }
     process.stdout.write(
       '\nBounds: honor each pipeline.md max-iterations / max-time; isolate per worktree; '
-      + 'development DB only, never seed:reset; record the outcome against the live tree. '
+      + 'development DB only, never run a destructive seed reset; record the outcome against the live tree. '
       + 'Pipelines with a Plan/approval gate stop for you.\n',
     )
   }

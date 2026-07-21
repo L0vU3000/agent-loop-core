@@ -23,23 +23,23 @@ dispatch a fix — written `approved: false` so nothing is fixed until the owner
 
 The deliverable is a document plus optional drafted tickets — never a product change. No source
 file, schema, migration, or database row is touched by this pipeline. Findings are advisory: the
-owner decides what to fix. This pipeline performs authorized defensive review of the Valgate
-codebase; it never produces a working exploit for use elsewhere.
+owner decides what to fix. This pipeline performs authorized defensive review of the app's codebase (see STACK.md);
+it never produces a working exploit for use elsewhere.
 
 ## What it looks for
 
-The bar is this repository's standing security rules (`CLAUDE.md` → Security Rules). The maker
+The bar is this repository's standing security rules (the project conventions doc → Security Rules). The maker
 hunts the change for:
 
 - **Missing authentication or authorization** — a mutation or data read that does not verify who
   the caller is, or does not verify the caller may act on this resource.
 - **IDOR / missing ownership check** — a resource fetched or mutated by id without confirming it
   belongs to the current user or org (the classic authz-without-ownership hole).
-- **Unvalidated input reaching the DB** — raw `FormData` or request input reaching a Drizzle
-  query without a Zod parse first.
+- **Unvalidated input reaching the DB** — raw `FormData` or request input reaching a data-layer
+  query without input validation first.
 - **Error leakage** — `err.message` (or a raw error object) returned to the client instead of a
   logged-internally, generic client string.
-- **Secret exposure** — a secret prefixed with `NEXT_PUBLIC_`, or a secret/full credential passed
+- **Secret exposure** — a secret exposed through a client-bundled/public env var (e.g. a `NEXT_PUBLIC_`-style prefix), or a secret/full credential passed
   as a prop into a Client Component.
 - **Missing rate limiting** — login, signup, or another sensitive action with no rate limit.
 - **Over-exposure to the client** — a full DB object sent as props where the UI needs only a few
@@ -60,7 +60,7 @@ elsewhere when the request is:
   real change set;
 - a request to attack, penetrate, or exfiltrate from a system that is not this codebase, or to
   produce a reusable exploit rather than a defensive finding — refuse; this pipeline reviews the
-  Valgate codebase for its own defense.
+  app's codebase for its own defense.
 
 ## Exit condition
 
@@ -70,7 +70,7 @@ A run passes only when every check is true:
    against the current code — it traced the unauthorized path or re-confirmed the missing check;
    none survive on the maker's assertion alone.
 2. **No false positives.** Any finding the verifier could not stand up — the "missing" check
-   turns out to exist upstream, the input is already Zod-validated, the value is not actually a
+   turns out to exist upstream, the input is already input-validated, the value is not actually a
    secret — was dropped, not shipped. A hallucinated or unreproducible vulnerability is a critical
    failure.
 3. **Evidence is cited.** Every surviving finding names a real `file:line`, quotes the exact
@@ -102,7 +102,7 @@ A different-model, read-only verifier takes the maker's findings and, for each o
 **disprove it**: it independently traces the unauthorized path (which caller, which resource id,
 which missing check) or re-reads the cited `file:line` to confirm the vulnerable code actually
 says what the finding claims — and checks that the guard the finding says is missing is not
-present upstream (a shared `requireOwner` helper, a Zod parse in the action, a `select` that never
+present upstream (a shared `requireOwner` helper, an input-validation parse in the action, a `select` that never
 exposes the field). Any finding it cannot stand up is **dropped** — it does not reach the owner.
 What the verifier grades objectively:
 
@@ -134,7 +134,7 @@ is a different-model, read-only verifier.
 - **Explore:** classify the request against the scope gate, confirm the target change resolves
   (branch/diff/PR exists and has a real diff), and map the change against the attack surface — the
   mutations, data reads, actions, client props, and env usage the change touches, and the standing
-  `CLAUDE.md` security rules each must satisfy. Record the review scope so Eval can check coverage.
+  project conventions doc security rules each must satisfy. Record the review scope so Eval can check coverage.
 - **Plan:** decide the review's scope boundaries, which security rules apply to this change, and
   the severity definitions, name the downstream building type a confirmed high-severity finding
   would resolve to, and author the task-specific 100-point Eval rubric. Findings-verified,
@@ -155,7 +155,7 @@ is a different-model, read-only verifier.
   data, or the live orchestrator inbox, and needs no worktree or database branch. That makes it
   one of the safest pipelines; its risk is a false-positive finding, which the verifier and the
   human gate catch.
-- **Defensive only.** The pipeline reviews the Valgate codebase for its own security. It documents
+- **Defensive only.** The pipeline reviews the app's codebase for its own security. It documents
   a vulnerability and its impact so the owner can close it; it does not produce a working exploit,
   test against live production, or touch any system other than this repository.
 - **Human checkpoint.** The review category's default gate applies: the owner reviews the findings

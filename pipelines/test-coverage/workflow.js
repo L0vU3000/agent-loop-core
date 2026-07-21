@@ -5,7 +5,7 @@
 // minted in explore and threaded through every stage (lesson from memory/errors.md).
 //
 // Optionally pass a target module as args, e.g.
-// Workflow({scriptPath, args: 'lib/services/co-owners.ts'})
+// Workflow({scriptPath, args: '<services-dir>/co-owners.ts'})
 
 export const meta = {
   name: 'test-coverage',
@@ -25,7 +25,7 @@ const TIER = PROVIDER === 'gpt'
   : { read: { model: 'sonnet' }, make: { model: 'opus' }, verify: { model: 'sonnet' } }
 
 const TARGET_HINT = (args || '').replace(/\s*--provider=\S+/, '').trim()
-  || '(no target passed — explore picks the highest-value untested lib/services module)'
+  || '(no target passed — explore picks the highest-value untested services-layer module)'
 const MAX = 5
 
 const DISCOVERY = { type: 'object', required: ['viable', 'runId'],
@@ -71,7 +71,7 @@ const found = await agent(
    Use \`graphify query\` to orient before reading code. Record the target module, its
    baseline statement coverage (cite the coverage output), the chosen test lane, and the
    behaviors worth testing. If the live-db lane is chosen, confirm DATABASE_URL in
-   .env.local is NOT the prod endpoint (ep-aged-cloud-*) and cite that check.
+   the dev environment config is NOT the prod endpoint (the prod database endpoint id in STACK.md) and cite that check.
    If nothing is worth testing, set viable=false and explain in note.`,
   { label: 'explore', schema: DISCOVERY, ...TIER.read })
 
@@ -116,8 +116,8 @@ while (i < MAX) {
   await agent(
     `You are the EXECUTE stage (MAKER). Follow ${P}/execute.md. Write only into
      \`${P}/runs/${RUN}/\` and the planned test file(s). Write exactly the planned tests.
-     Do NOT change product code. Live-db lane: Neon dev branch only, create-then-clean-up,
-     never seed:reset.`,
+     Do NOT change product code. Live-db lane: the dev database only, create-then-clean-up,
+     never run a destructive seed reset.`,
     { label: `execute#${i}`, phase: 'Test loop', ...TIER.make })
 
   const v = await agent(

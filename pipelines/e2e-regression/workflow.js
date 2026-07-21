@@ -61,8 +61,8 @@ const triage = await agent(
   `You are the EXPLORE stage of the e2e-regression pipeline. Follow ${P}/explore.md.
    First mint ONE run-id for this whole execution: \`date "+%Y-%m-%d-%H%M%S"\`, then
    \`mkdir -p ${P}/runs/<run-id>\` — every later stage writes ONLY into that folder.
-   Preflight: node >= 24, dev server (reuse 3002 or start \`npm run dev:e2e\` in background),
-   .env.local not prod (ep-aged-cloud-*). Run the e2e suite once; rerun each failing spec up
+   Preflight: node >= 24, dev server (reuse the dev server port or start the e2e dev-server command (see STACK.md) in background),
+   the dev environment config not prod (the prod database endpoint id in STACK.md). Run the e2e suite once; rerun each failing spec up
    to 3x to classify regression vs flake; write the disposition table with trace evidence.
    Return runId, suiteGreen, regressionCount, flakeCount.`,
   { label: 'explore', schema: TRIAGE, ...TIER.read })

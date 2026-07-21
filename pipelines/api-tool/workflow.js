@@ -5,18 +5,18 @@
 // model. A single runId is minted once and threaded through every stage (lesson from
 // memory/errors.md — do not let stages invent their own).
 //
-// This pipeline WRAPS an existing lib/services/* function over the tool surface (MCP tool or API
-// endpoint) through the ctxFor() seam. It adds no new business logic and no schema; if the
+// This pipeline WRAPS an existing services-layer function over the tool surface (MCP tool or API
+// endpoint) through the request-context seam. It adds no new business logic and no schema; if the
 // service is missing, explore refuses and routes to feature/entity/migration.
 //
 // Isolation: execute runs in a git worktree (harness-provided), so the maker's edits never touch
-// the live tree; see pipeline.md Guardrails. Data-touching services use a Neon dev branch only.
+// the live tree; see pipeline.md Guardrails. Data-touching services use the dev database only.
 //
 // Pass the ticket path as args, e.g. Workflow({scriptPath, args: 'agent-loop/orchestrator/inbox/<ticket>.md'})
 
 export const meta = {
   name: 'api-tool',
-  description: 'Wrap one existing lib/services function as a new MCP tool / API endpoint via ctxFor: validate input, enforce the service authorization, hide internal errors, prove it end-to-end',
+  description: 'Wrap one existing services-layer function as a new MCP tool / API endpoint via the request-context seam: validate input, enforce the service authorization, hide internal errors, prove it end-to-end',
   phases: [{ title: 'Specify' }, { title: 'Wire loop' }],
 }
 
@@ -77,12 +77,12 @@ const spec = await agent(
    Ticket: ${TICKET}.
    First mint ONE run-id for this whole execution: \`date "+%Y-%m-%d-%H%M%S"\`, then
    \`mkdir -p ${P}/runs/<run-id>\` — every later stage writes ONLY into that folder.
-   Use \`graphify query\` to orient before reading code. CONFIRM the target lib/services/*
+   Use \`graphify query\` to orient before reading code. CONFIRM the target services-layer
    function already exists — this pipeline only WRAPS existing behavior over the tool surface
-   through ctxFor(); it adds no new business logic and no schema. If the service is missing, set
+   through the request-context seam; it adds no new business logic and no schema. If the service is missing, set
    specified=false and note that it needs feature/entity/migration first. Otherwise write a
    FAILING tool test (happy path + cross-tenant rejection + malformed-input rejection) that
-   drives the tool end-to-end through ctxFor() (confirm it is red for the right reason — the tool
+   drives the tool end-to-end through the request-context seam (confirm it is red for the right reason — the tool
    is absent). Return specified, runId, testPath, and the serviceFn being wrapped. If the
    caller-facing shape is ambiguous, set specified=false and explain in note — do not invent it.`,
   { label: 'explore', schema: SPEC, ...TIER.read })
@@ -108,7 +108,7 @@ while (i < MAX) {
      Wrapping service fn: ${spec.serviceFn}. Failing tool test: ${spec.testPath}.
      ${last ? `Previous attempt failed: ${last}. Adjust the wiring (NOT the rubric).` : ''}
      Plan the smallest wiring that makes the tool test pass — a THIN wrapper over the existing
-     service through ctxFor(), reusing the site's existing Zod schema, no new logic or schema.
+     service through the request-context seam, reusing the app's existing input-validation schema, no new logic or schema.
      Create the task-specific 100-point Eval rubric required by plan.md, with authorization
      enforced, input validated, and no error leakage as the heaviest CRITICAL criteria. Hash the
      exact Eval-rubric section with SHA-256 and return rubricReady, passThreshold, and
@@ -132,7 +132,7 @@ while (i < MAX) {
   await agent(
     `You are the EXECUTE stage (MAKER). Follow ${P}/execute.md. Write only into
      \`${P}/runs/${RUN}/\`. Wire exactly what the plan describes — a thin tool wrapper over the
-     existing service through ctxFor(), input validated by the existing Zod schema, generic
+     existing service through the request-context seam, input validated by the existing input-validation schema, generic
      client errors only. Do NOT modify the tool test to make it pass. Do NOT add business logic,
      schema, or re-implement the service's authorization. If the plan is wrong, stop and report —
      don't improvise.`,
@@ -142,7 +142,7 @@ while (i < MAX) {
     `You are the EVAL stage (VERIFIER — a DIFFERENT agent from the maker). Follow ${P}/eval.md.
      Write your verdict to \`${P}/runs/${RUN}/eval.md\`. Run the tool test at ${spec.testPath}
      (must go green, unmodified; drives happy path + cross-tenant rejection + malformed-input
-     rejection through ctxFor()), confirm the tool wraps the real service with no new logic,
+     rejection through the request-context seam), confirm the tool wraps the real service with no new logic,
      \`npx vitest run\` (whole suite green), \`npx tsc --noEmit\` (0 errors), and \`${LINT}\`
      (no new warnings). Return the verdict with cited evidence. Apply the locked rubric at
      SHA-256 ${lockedRubricSha256} and threshold ${lockedPassThreshold}/100. Return score,

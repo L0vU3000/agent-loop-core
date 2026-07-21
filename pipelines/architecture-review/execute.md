@@ -11,17 +11,17 @@ Review only the files and modules the plan named as in scope. Use `graphify quer
 to map the dependency edges before reading source. Hunt for structural problems:
 
 - **Layering violations against this repo's rules** — a component or route handler querying the
-  database directly instead of going through `lib/services/*`; business logic living in a route
-  handler; `useEffect` used for an initial data load instead of fetching in a Server Component; a
-  client component importing a server-only secret or a `NEXT_PUBLIC_`-prefixed secret; a mutation
-  path with no service layer between it and Drizzle.
+  database directly instead of going through the services layer (see STACK.md); business logic living in a route
+  handler; `useEffect` used for an initial data load instead of fetching on the server (server-first, if your framework supports it); a
+  client component importing a server-only secret, or a secret exposed through a client-bundled/public env var (e.g. a `NEXT_PUBLIC_`-style prefix); a mutation
+  path with no service layer between it and the data layer.
 - **Tight coupling** — modules that reach across boundaries they should not, a service depending on
   a component, shared mutable state, or a change surface that fans out far wider than it should.
 - **Dependency cycles** — two or more modules that depend on each other, surfaced by `graphify path`.
-- **Drift from `CLAUDE.md` architecture rules** — anywhere the code contradicts the standing rules
+- **Drift from the project conventions doc's architecture rules** — anywhere the code contradicts the standing rules
   Explore recorded.
 - **Dead or parallel code** — modules the app no longer calls, or a parallel implementation of a
-  live path (most notably any live import into the archived `archive/convex/` layer, which the app
+  live path (most notably any live import into a dead or parallel backend layer, which the app
   does not use).
 
 Do not report line-level correctness bugs, security vulnerabilities, or visual/design issues — those
@@ -34,7 +34,7 @@ State the **review scope** you covered (the exact files/modules), then list each
 
 - **Severity** — high / medium / low, graded against the plan's severity definitions.
 - **Location** — a real `file:line` or a named module in scope.
-- **Evidence** — cite the exact `CLAUDE.md` rule the code violates or the dependency edge (from
+- **Evidence** — cite the exact rule in the project conventions doc the code violates or the dependency edge (from
   `graphify path`/`query`) that proves the coupling or cycle, and quote the code or graph result
   that substantiates it. A reader must be able to re-verify the violation from what you wrote.
 - **Why it matters** — one sentence on the structural impact.

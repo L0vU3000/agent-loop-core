@@ -7,7 +7,7 @@ type: migration
 # Pipeline: migration
 
 > Applies one already-approved, additive schema change to an existing table through the
-> repository's hand-authored migration path: an updated Drizzle table definition, a
+> repository's hand-authored migration path: an updated schema definition (see STACK.md), a
 > hand-written SQL migration under `lib/db/migrations/`, an updated `scripts/schema-assert.ts`
 > inventory, and an optional additive backfill. It changes one existing table; it does not
 > add a whole new entity and it does not decide which schema changes the product needs.
@@ -23,7 +23,7 @@ without inventing fields, widening product scope, or touching data destructively
 The ticket must explicitly mark the schema change approved and provide:
 
 - the existing target table and the single change being made;
-- for a new column: domain name, Zod type (if exposed), database column/type, optionality,
+- for a new column: domain name, validation-layer type (if exposed), database column/type, optionality,
   default, and whether a backfill is required;
 - for a new index: the columns and uniqueness;
 - for a new enum value: the enum and the value;
@@ -74,17 +74,17 @@ A run passes only when all checks are true:
 
 1. The unchanged focused assertion written by Explore is red before the migration (the target
    column, index, enum value, or constraint is absent) and green after (it exists).
-2. The updated Drizzle table definition, the hand-authored SQL migration, its journal entry,
-   the `scripts/schema-assert.ts` inventory, and any exposed Zod field all implement the
+2. The updated schema definition, the hand-authored SQL migration, its journal entry,
+   the `scripts/schema-assert.ts` inventory, and any exposed validation-layer field all implement the
    approved change and nothing else.
 3. The migration is additive — confirmed by manual inspection of the SQL — with no `DROP`,
    `TRUNCATE`, rename, type narrowing, or data rewrite, and any backfill only fills the new
-   field. Its `when` timestamp is monotonic against the existing journal so drizzle does not
+   field. Its `when` timestamp is monotonic against the existing journal so the migration tool does not
    silently skip it.
 4. The migration applies cleanly on the approved development branch, `npm run db:assert`
    passes, and the new schema object is present in the live schema.
 5. `npm run db:check` shows no *new* collision versus the Explore baseline — graded the same
-   relative way as ESLint, because this repo carries an accepted pre-existing `drizzle-kit`
+   relative way as ESLint, because this repo carries an accepted pre-existing migration-tool
    snapshot collision (0008/0011) that aborts `db:check` upstream of any new migration. A new
    collision the migration introduces still fails.
 6. `npx vitest run`, `npx tsc --noEmit`, and `npx eslint app lib components` retain the run's
@@ -98,12 +98,11 @@ reason rather than a broken harness. The live apply on the development branch pr
 hand-authored SQL runs cleanly, that `schema-assert` still matches the live schema, and that
 `db:check` gains no new migration-history collision. A migration graph that checks clean does
 not prove an individual migration is non-destructive, so the verifier also reads the raw SQL
-and rules on additivity by manual inspection. Because `drizzle-kit generate` is unreliable in
-this repo, the SQL is hand-authored (see `vault/decisions/drizzle-only-hand-authored-migrations.md`),
+and rules on additivity by manual inspection. Because the migration tool's generate step is unreliable in
+this repo, the SQL is hand-authored (see the project's hand-authored-migrations decision),
 and `db:check` is graded relative to the recorded baseline:
 
-- https://orm.drizzle.team/docs/kit-overview
-- https://orm.drizzle.team/docs/drizzle-kit-migrate
+- Consult STACK.md for the data layer's migration-tool and schema-kit documentation.
 
 ## Stages
 
@@ -125,7 +124,7 @@ Eval is a different-model, read-only verifier.
   SQL is hand-authored and resumes with `--approved-migration`. Removing these stops requires a
   later, reviewed pipeline-definition change after a successful real run is recorded.
 - **Isolation:** one pipeline run per git worktree.
-- **Database:** development Neon branch only. Never production, never `seed:reset`, never
+- **Database:** dev database only. Never production, never a destructive seed reset, never
   `ALLOW_DESTRUCTIVE_DB=1`.
 - **Additive only:** no `DROP`, `TRUNCATE`, data rewrite, rename, or type-narrowing change; a
   backfill may only fill the new field.

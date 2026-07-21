@@ -10,7 +10,7 @@ produce `runs/<run-id>/plan.md`:
 
 1. **Concrete test cases** — for each behavior: the setup, the call, the assertion. Cover
    the happy path, at least one edge case, and at least one error path per public function
-   you're targeting. Name the test file path (`lib/services/<module>.test.ts` or
+   you're targeting. Name the test file path in the services layer (see STACK.md) (`<module>.test.ts` or
    `<module>.db.test.ts` per the lane).
 2. **Mocking strategy** — exactly what gets mocked (the `db` client? a sibling service?)
    and what stays real. In the live-DB lane: which rows you create, their recognizable id

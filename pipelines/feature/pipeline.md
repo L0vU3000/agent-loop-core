@@ -50,8 +50,8 @@ red-first step guards against tests that vacuously pass; the global gates guard 
 ## Guardrails
 
 - **Isolation:** run in a git worktree.
-- **Data safety:** if the feature touches data, use a **Neon dev branch** — never prod,
-  **never `seed:reset`**.
+- **Data safety:** if the feature touches data, use **the dev database (see STACK.md)** — never prod,
+  **never run a destructive seed reset**.
 - **The test is the spec:** `execute` must not edit the acceptance tests to make them pass.
 - **Bounds:** `max-iterations: 6`, `max-time: 60m`.
 - **Escalate on ambiguity:** if the ticket's criteria are unclear, or the build needs a

@@ -4,16 +4,16 @@ You are the Plan stage. Read `runs/<run-id>/explore.md`. Do not edit source or t
 
 Write `runs/<run-id>/plan.md` with:
 
-1. The approved change stated exactly: for a column, its Drizzle definition, database type,
+1. The approved change stated exactly: for a column, its schema definition (see STACK.md), database type,
    optionality, default, and any conversion; for an index, its columns and uniqueness; for an
    enum value, the enum and value; for a constraint, its definition. Confirm it is additive and
    that existing rows already satisfy it.
 2. The exact files to add or modify:
-   - the target `lib/db/schema/*.ts` module (and `index.ts` if a new export is needed);
-   - the appropriate `lib/data/types/*.ts` Zod field only when the change is exposed to the app;
+   - the target schema-directory module (and `index.ts` if a new export is needed);
+   - the appropriate shared-types-directory validation-layer field only when the change is exposed to the app;
    - one hand-authored SQL migration under `lib/db/migrations/` with a `when` timestamp
      monotonically greater than the latest journal entry recorded by Explore, plus its journal
-     entry — never `drizzle-kit generate`, which is broken here;
+     entry — never the migration tool's generate step, which is broken here;
    - the optional additive backfill, written as an `UPDATE` that only fills the new field;
    - `scripts/schema-assert.ts` table/inventory update for the new schema object;
    - the unchanged focused schema-presence assertion.

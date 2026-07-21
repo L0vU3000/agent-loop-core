@@ -1,11 +1,11 @@
 // entity-scaffold — built-in Workflow runtime.
-// One approved property-child entity: scope → plan approval → migration preparation →
+// One approved org-scoped child entity: scope → plan approval → migration preparation →
 // migration approval → apply → independent eval. Eval failure returns to Plan.
 // A single shared run-id is threaded through every invocation and stage.
 
 export const meta = {
   name: 'entity-scaffold',
-  description: 'Build one approved org-scoped property-child entity through every backend layer',
+  description: 'Build one approved org-scoped child entity through every backend layer',
   phases: [{ title: 'Scope and plan' }, { title: 'Prepare migration' }, { title: 'Apply and verify' }],
 }
 
@@ -249,7 +249,7 @@ await agent(
    applied at this digest on a prior attempt, a "no pending migrations" / already-applied result
    is success, not a failure; do not re-create or alter anything), run schema assertion,
    seed, and focused DB checks, then append attempt ${attempt} evidence to execute.md. Never use
-   production, seed:reset, or ALLOW_DESTRUCTIVE_DB=1.`,
+   production, a destructive seed reset, or ALLOW_DESTRUCTIVE_DB=1.`,
   { label: `execute-apply#${attempt}`, phase: 'Apply and verify', model: 'opus' },
 )
 

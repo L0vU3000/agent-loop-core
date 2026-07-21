@@ -5,8 +5,8 @@
 //   1. Confirms this folder sits one level under a repo root (the machinery
 //      resolves the repo as its own parent directory).
 //   2. Resets all instance data to an empty slate (safe to re-run — idempotent).
-//   3. Reports any pipeline prose still carrying the ORIGIN project's vocabulary,
-//      so you know exactly which files to adapt to the new project.
+//   3. Checks whether STACK.md has been filled in — the one file that tells the
+//      pipelines what your database / ORM / auth / services layer actually are.
 //
 // Run once, from inside the agent-loop folder, right after you copy it in:
 //   node init.mjs
@@ -14,15 +14,11 @@
 // Pure Node built-ins — no npm install.
 
 import { readdirSync, existsSync, rmSync, writeFileSync, statSync, readFileSync } from 'node:fs'
-import { dirname, join, resolve, relative } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const AGENT_LOOP_ROOT = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(AGENT_LOOP_ROOT, '..')
-
-// Terms that mean "this file still describes the project we copied FROM."
-// Edit this list to match wherever you extracted the core from.
-const ORIGIN_TERMS = ['valgate', 'neon', 'drizzle', 'clerk', 'lib/services', '/pro/']
 
 function log(line) {
   process.stdout.write(line + '\n')
@@ -82,46 +78,45 @@ if (existsSync(heartbeat)) rmSync(heartbeat)
 
 log(`✔ Instance data reset (${wiped} stale item(s) cleared).`)
 
-// --- 3. report pipeline prose that still names the origin project --------
-// Walk every .md under agent-loop and flag files containing origin vocabulary.
-function walkMarkdown(dir, out) {
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name)
-    const info = statSync(full)
-    if (info.isDirectory()) {
-      if (name === 'node_modules' || name === '.git') continue
-      walkMarkdown(full, out)
-    } else if (name.endsWith('.md')) {
-      out.push(full)
-    }
-  }
-}
-
-const allMd = []
-walkMarkdown(AGENT_LOOP_ROOT, allMd)
-
-const needsReview = []
-for (const file of allMd) {
-  const text = readFileSync(file, 'utf8').toLowerCase()
-  const hits = ORIGIN_TERMS.filter((term) => text.includes(term.toLowerCase()))
-  if (hits.length > 0) {
-    needsReview.push({ file: relative(AGENT_LOOP_ROOT, file), hits })
-  }
-}
-
-if (needsReview.length === 0) {
-  log('✔ No origin-project vocabulary found — pipelines look project-neutral.')
+// --- 3. check STACK.md has been filled in --------------------------------
+// The pipelines refer to your stack by role (database, ORM, auth, services layer).
+// STACK.md is the one file mapping each role to the concrete tool/path in THIS
+// project. Its table ships with the middle column blank; flag rows still empty.
+const stackPath = join(AGENT_LOOP_ROOT, 'STACK.md')
+if (!existsSync(stackPath)) {
+  log('⚠ STACK.md is missing — pipelines have nowhere to look up your stack. Restore it.')
 } else {
-  log(`\n⚠ ${needsReview.length} file(s) still describe the origin project. Adapt these to your stack:`)
-  for (const { file, hits } of needsReview) {
-    log(`   • ${file}  (${hits.join(', ')})`)
+  const rows = readFileSync(stackPath, 'utf8').split('\n')
+  // A stack row looks like: | Role | This project | Example |
+  // Count rows whose middle cell (the "fill in" column) is blank.
+  const blankRows = rows.filter((line) => {
+    const cells = line.split('|').map((c) => c.trim())
+    if (cells.length < 5) {
+      return false
+    }
+
+    // cells[0] and cells[last] are the line's outer edges (empty); real cells are the middle.
+    const role = cells[1]
+    const projectValue = cells[2]
+    if (role.length === 0) {
+      return false
+    }
+
+    const isHeaderOrDivider = /^(Role|-+|:?-+:?)$/i.test(role) || role.startsWith('Role ')
+    return !isHeaderOrDivider && projectValue.length === 0
+  })
+  if (blankRows.length === 0) {
+    log('✔ STACK.md looks filled in.')
+  } else {
+    log(`\n⚠ STACK.md has ${blankRows.length} role(s) not yet filled in. The pipelines defer to it —`)
+    log('   set the middle column for your database, ORM, auth, services layer, etc. before running:')
+    log('   → ' + join('agent-loop', 'STACK.md'))
   }
-  log('\n   These are the pipeline PROSE (examples, references) — the machinery is generic.')
-  log('   Edit the wording to match your framework/DB/auth. The loop still runs before you do.')
 }
 
 // --- next steps -----------------------------------------------------------
 log('\nNext:')
+log('  • Fill in STACK.md:         agent-loop/STACK.md  (your database / ORM / auth / paths)')
 log('  • Start a first work item:  drop a note in orchestrator/inbox/  (see orchestrator/orchestrator.md)')
 log('  • Run one tick:             node agent-loop/orchestrator/tick.mjs')
 log('  • Read the entry point:     agent-loop/agent-loop.md')

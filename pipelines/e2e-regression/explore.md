@@ -6,9 +6,9 @@ the suite says and *classify* every failure — not to fix anything.
 ## Your job
 
 1. **Preflight** — `node --version` must be ≥ 24 (hard stop otherwise; that's a tooling
-   ticket, not a triage run). Dev server: reuse port 3002 if it answers, else start
-   `npm run dev:e2e` in the background. Confirm `.env.local` is not the prod endpoint
-   (`ep-aged-cloud-*`).
+   ticket, not a triage run). Dev server: reuse the dev server port if it answers, else start
+   the e2e dev-server command (see STACK.md) in the background. Confirm `.env.local` is not the
+   prod endpoint (its id is in STACK.md).
 2. **Full run** — run the `e2e/` suite once (`workers: 1`, traces retained on failure).
    All green → record it and stop; the run ends clean.
 3. **Check open de-flake tickets against the suite's skip state** — a green suite alone does
@@ -34,7 +34,7 @@ the suite says and *classify* every failure — not to fix anything.
 ## Rules
 
 - Read-only on product code and specs. You write only run notes.
-- Never `networkidle`; never `seed:reset`.
+- Never `networkidle`; never run a destructive seed reset.
 - A failure you can't classify in 3 reruns is recorded as `flake` (safer: it goes to
   quarantine with a ticket, nothing gets "fixed" on a guess).
 - Never report `ticketedQuarantinesUnskipped: true` while an open de-flake ticket's named
