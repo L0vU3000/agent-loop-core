@@ -13,7 +13,7 @@
 //
 // Pure Node built-ins — no npm install.
 
-import { readdirSync, existsSync, rmSync, writeFileSync, statSync, readFileSync } from 'node:fs'
+import { readdirSync, existsSync, rmSync, writeFileSync, statSync, readFileSync, copyFileSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -78,7 +78,23 @@ if (existsSync(heartbeat)) rmSync(heartbeat)
 
 log(`✔ Instance data reset (${wiped} stale item(s) cleared).`)
 
-// --- 3. check STACK.md has been filled in --------------------------------
+// --- 3. install the project-level Claude command -------------------------
+// The template is copied into <project>/agent-loop, but Claude Code discovers commands only from
+// <project>/.claude/commands. Install the bundled entry point on first adoption without ever
+// overwriting a command the consuming project has customized.
+const bundledOrchestrateCommand = join(AGENT_LOOP_ROOT, '.claude', 'commands', 'orchestrate.md')
+const projectOrchestrateCommand = join(REPO_ROOT, '.claude', 'commands', 'orchestrate.md')
+if (existsSync(bundledOrchestrateCommand)) {
+  if (existsSync(projectOrchestrateCommand)) {
+    log('ℹ Kept existing project command: .claude/commands/orchestrate.md')
+  } else {
+    mkdirSync(dirname(projectOrchestrateCommand), { recursive: true })
+    copyFileSync(bundledOrchestrateCommand, projectOrchestrateCommand)
+    log('✔ Installed Claude command: .claude/commands/orchestrate.md')
+  }
+}
+
+// --- 4. check STACK.md has been filled in --------------------------------
 // The pipelines refer to your stack by role (database, ORM, auth, services layer).
 // STACK.md is the one file mapping each role to the concrete tool/path in THIS
 // project. Its table ships with the middle column blank; flag rows still empty.
@@ -117,6 +133,7 @@ if (!existsSync(stackPath)) {
 // --- next steps -----------------------------------------------------------
 log('\nNext:')
 log('  • Fill in STACK.md:         agent-loop/STACK.md  (your database / ORM / auth / paths)')
+log('  • Use Claude intake:        /orchestrate <request>  (after reopening Claude Code)')
 log('  • Start a first work item:  drop a note in orchestrator/inbox/  (see orchestrator/orchestrator.md)')
 log('  • Run one tick:             node agent-loop/orchestrator/tick.mjs')
 log('  • Read the entry point:     agent-loop/agent-loop.md')

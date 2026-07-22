@@ -173,6 +173,12 @@ if [ -f "$orchestrate_command" ] \
 else
   bad "Claude /orchestrate command is missing or not wired to the orchestration gates"
 fi
+if node --test scripts/check-init-orchestrate-command.regression.mjs > /dev/null; then
+  good "init installs /orchestrate at the consuming project root without overwriting it"
+else
+  bad "init Claude command installation regression check failed"
+  node --test scripts/check-init-orchestrate-command.regression.mjs 2>&1 | sed 's/^/      /' || true
+fi
 
 # e2e-regression must not trust a green suite alone: a run whose open de-flake ticket names a test
 # still test.skip-quarantined reports green only because the target never ran. The clean path must
