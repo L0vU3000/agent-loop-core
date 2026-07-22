@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { parseEvalScorecard, evalCandidate, runCandidates, buildDigest } from '../orchestrator/improvement-digest.mjs'
+import { parseEvalScorecard, evalCandidate, runCandidates, dispatchCandidates, machineryCandidate, buildDigest } from '../orchestrator/improvement-digest.mjs'
 
 test('parseEvalScorecard reads the current scorecard block', () => {
   const parsed = parseEvalScorecard(
@@ -89,6 +89,47 @@ test('runCandidates flags a cost outlier once a pipeline has enough runs', () =>
   const spendy = runCandidates(runs).find((c) => c.where.endsWith('spendy'))
   assert.ok(spendy, 'the 10x-cost run should be a candidate')
   assert.match(spendy.what, /cost outlier/)
+})
+
+test('dispatchCandidates flags a doorway downgrade and ignores plain outcomes', () => {
+  const log = [
+    '<!-- header -->',
+    '- clean-feature.md -> pass (all gates green)',
+    '- self-reported-fail.md -> fail (author judged it incomplete)',
+    '- false-pass.md -> fail (verdict overruled by record gate: eslint gate found 5 new errors)',
+    '',
+  ].join('\n')
+  const candidates = dispatchCandidates(log)
+  assert.equal(candidates.length, 1, 'only the doorway downgrade is a signal, not the plain pass/fail lines')
+  assert.equal(candidates[0].where, 'doorway · false-pass.md')
+  assert.equal(candidates[0].severity, 95)
+  assert.match(candidates[0].what, /overruled by record gate.*5 new errors/)
+})
+
+test('machineryCandidate fires only on a failed self-check', () => {
+  assert.equal(machineryCandidate(null), null)
+  assert.equal(machineryCandidate({ verdict: 'pass', when: '2026-07-22T04:00:00Z' }), null)
+  const failed = machineryCandidate({ verdict: 'fail', when: '2026-07-22T04:00:00Z' })
+  assert.equal(failed.severity, 100)
+  assert.match(failed.what, /machinery self-check FAILED.*2026-07-22/)
+})
+
+test('a doorway downgrade outranks an eval fail, and machinery failure tops both', () => {
+  const digest = buildDigest({
+    evals: [{ pipeline: 'bug-fix', run: 'r9', verdict: 'fail', score: 40, threshold: 85, criticalFailures: 1 }],
+    dispatch: '- false-pass.md -> fail (verdict overruled by record gate: gate failed)\n',
+    machinery: { verdict: 'fail', when: '2026-07-22T04:00:00Z' },
+    errors: { count: 0, latest: null },
+    now: '2026-07-22 05:00',
+  })
+  const machineryIndex = digest.indexOf('machinery · check-machinery.sh')
+  const doorwayIndex = digest.indexOf('doorway · false-pass.md')
+  const evalIndex = digest.indexOf('bug-fix · run r9')
+  assert.ok(machineryIndex !== -1 && doorwayIndex !== -1 && evalIndex !== -1, 'all three candidates present')
+  assert.ok(machineryIndex < doorwayIndex, 'machinery failure ranks first')
+  assert.ok(doorwayIndex < evalIndex, 'doorway downgrade ranks above the eval fail')
+  assert.match(digest, /## Machinery self-check/)
+  assert.match(digest, /🔴 FAILED/)
 })
 
 test('buildDigest ranks by severity and renders the empty state', () => {

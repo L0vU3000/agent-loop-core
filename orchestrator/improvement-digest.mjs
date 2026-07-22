@@ -136,6 +136,36 @@ export function runCandidates(runs) {
   return candidates
 }
 
+// The dispatch ledger -> candidates. The one signal we care about here is a DOORWAY DOWNGRADE:
+// the record gate re-verified a claimed PASS and overruled it to fail (dispatch.mjs decideRecord
+// writes the marker below). That is the exact failure mode the eval/metrics streams are blind to —
+// the pipeline's own eval said pass, the objective gate disagreed — so it ranks above an eval fail.
+export function dispatchCandidates(logText) {
+  const candidates = []
+  for (const line of (logText || '').split('\n')) {
+    const match = line.match(/^- (.+?) -> fail \((verdict overruled by record gate:.*)\)\s*$/)
+    if (match) {
+      candidates.push({ severity: 95, where: `doorway · ${match[1]}`, what: match[2] })
+    }
+  }
+  return candidates
+}
+
+// Machinery self-check status -> a single top-priority candidate when the last run FAILED. The tools
+// guard every pipeline, so a broken machinery check outranks any per-run weakness. A pass or a
+// never-run status flags nothing here — it is still shown verbatim in the Machinery section so a
+// clean backlog is trustworthy and a stale green is visible by its timestamp.
+export function machineryCandidate(status) {
+  if (!status || status.verdict !== 'fail') {
+    return null
+  }
+  return {
+    severity: 100,
+    where: 'machinery · check-machinery.sh',
+    what: `machinery self-check FAILED${status.when ? ` (last run ${status.when})` : ''} — scaffolding guarding every pipeline is broken`,
+  }
+}
+
 function severityIcon(severity) {
   if (severity >= 90) {
     return '🔴'
@@ -151,11 +181,13 @@ function severityIcon(severity) {
 // ponytail: eval-side and metrics-side candidates are two independent streams keyed differently
 // (run folder vs wf id), so a hard failure can list twice with different "where". Acceptable —
 // join them on result.runId only if the duplication ever gets noisy.
-export function buildDigest({ runs = [], evals = [], errors = { count: 0, latest: null }, now }) {
+export function buildDigest({ runs = [], evals = [], errors = { count: 0, latest: null }, dispatch = '', machinery = null, now }) {
   const candidates = [
+    machineryCandidate(machinery),
     ...evals.map(evalCandidate).filter(Boolean),
     ...runCandidates(runs),
-  ].sort((a, b) => b.severity - a.severity || a.where.localeCompare(b.where))
+    ...dispatchCandidates(dispatch),
+  ].filter(Boolean).sort((a, b) => b.severity - a.severity || a.where.localeCompare(b.where))
 
   const lines = []
   lines.push('# Improvement candidates')
@@ -176,6 +208,16 @@ export function buildDigest({ runs = [], evals = [], errors = { count: 0, latest
     for (const candidate of candidates) {
       lines.push(`| ${severityIcon(candidate.severity)} ${candidate.severity} | ${candidate.where} | ${candidate.what} |`)
     }
+  }
+  lines.push('')
+
+  lines.push('## Machinery self-check')
+  lines.push('')
+  if (!machinery || machinery.verdict == null) {
+    lines.push('- _No `check-machinery.sh` run recorded yet._')
+  } else {
+    const icon = machinery.verdict === 'fail' ? '🔴 FAILED' : '🟢 passed'
+    lines.push(`- Last run: ${icon}${machinery.when ? ` — ${machinery.when}` : ''}`)
   }
   lines.push('')
 
@@ -247,11 +289,30 @@ function readErrors(agentLoopRoot) {
   return { count: headings.length, latest: headings[headings.length - 1] || null }
 }
 
+function readDispatchLog(agentLoopRoot) {
+  const logFile = join(agentLoopRoot, 'orchestrator', 'dispatch-log.md')
+  return existsSync(logFile) ? readFileSync(logFile, 'utf8') : ''
+}
+
+// check-machinery.sh drops a one-line "<pass|fail> <iso-timestamp>" stamp on every run. Reading it
+// (rather than re-running the heavy self-check) keeps this digest pure and cheap, and the timestamp
+// makes a stale green visible.
+function readMachineryStatus(agentLoopRoot) {
+  const statusFile = join(agentLoopRoot, 'memory', 'machinery-status.txt')
+  if (!existsSync(statusFile)) {
+    return null
+  }
+  const match = readFileSync(statusFile, 'utf8').trim().match(/^(pass|fail)\s+(.*)$/)
+  return match ? { verdict: match[1], when: match[2] || null } : null
+}
+
 function runCli(agentLoopRoot = DEFAULT_AGENT_LOOP_ROOT) {
   const digest = buildDigest({
     runs: readLedger(agentLoopRoot),
     evals: readEvals(agentLoopRoot),
     errors: readErrors(agentLoopRoot),
+    dispatch: readDispatchLog(agentLoopRoot),
+    machinery: readMachineryStatus(agentLoopRoot),
     now: new Date().toISOString().replace('T', ' ').slice(0, 16),
   })
   if (process.argv.includes('--print')) {

@@ -340,8 +340,13 @@ else
 fi
 
 # --- verdict ---------------------------------------------------------------------
+# Persist the verdict so the improvement digest can surface machinery health without re-running this
+# heavy check. One line: "<pass|fail> <iso-timestamp>". Read by orchestrator/improvement-digest.mjs.
+stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 if [ "$fail" -ne 0 ]; then
+  printf 'fail %s\n' "$stamp" > memory/machinery-status.txt
   say "check-machinery: FAILED"
   exit 1
 fi
+printf 'pass %s\n' "$stamp" > memory/machinery-status.txt
 say "check-machinery: all good"
