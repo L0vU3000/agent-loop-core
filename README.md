@@ -34,6 +34,14 @@ node agent-loop/init.mjs
 node agent-loop/orchestrator/tick.mjs
 ```
 
+For Claude Code users, `init.mjs` installs `.claude/commands/orchestrate.md` at the consuming
+project root (without replacing an existing command). It provides `/orchestrate <request>`: draft
+and validate a work item, get one start approval, then run the routed pipeline and record its
+outcome. `/orchestrate plan` is a dry-run; plain `/orchestrate` processes already queued work.
+The command reads `STACK.md` rather than assuming a particular database, auth provider, or
+deployment platform. Existing projects should copy the command manually rather than re-run
+`init.mjs`, which resets loop state.
+
 The pipelines are already project-neutral: they refer to your stack by **role** (the
 database, the data layer, the auth provider, the services layer) and defer the concrete
 tool/path to [`STACK.md`](STACK.md). Fill that one file in and every pipeline knows your
@@ -76,6 +84,7 @@ agent-loop/
 ├── memory/              ← decisions / errors / changelog — self-improvement substrate
 ├── vault/               ← curated human knowledge + protected project skeleton
 ├── .obsidian/           ← repository-safe shared Obsidian settings
+├── .claude/commands/    ← bundled `/orchestrate` source; init installs it at the project root
 └── scripts/             ← regression checks + dashboard (run scripts/check-machinery.sh)
 ```
 

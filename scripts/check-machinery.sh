@@ -162,6 +162,24 @@ else
   node --test scripts/check-work-item.regression.mjs 2>&1 | sed 's/^/      /' || true
 fi
 
+# The user-facing Claude Code entry point must keep drafting outside the live inbox and pass every
+# item through the same deterministic checker before it can be routed.
+orchestrate_command=".claude/commands/orchestrate.md"
+if [ -f "$orchestrate_command" ] \
+  && grep -q 'check-work-item.mjs' "$orchestrate_command" \
+  && grep -q 'orchestrator/tick.mjs' "$orchestrate_command" \
+  && grep -q 'orchestrator/dispatch.mjs --record' "$orchestrate_command"; then
+  good "Claude /orchestrate command is wired to validate, tick, and record"
+else
+  bad "Claude /orchestrate command is missing or not wired to the orchestration gates"
+fi
+if node --test scripts/check-init-orchestrate-command.regression.mjs > /dev/null; then
+  good "init installs /orchestrate at the consuming project root without overwriting it"
+else
+  bad "init Claude command installation regression check failed"
+  node --test scripts/check-init-orchestrate-command.regression.mjs 2>&1 | sed 's/^/      /' || true
+fi
+
 # e2e-regression must not trust a green suite alone: a run whose open de-flake ticket names a test
 # still test.skip-quarantined reports green only because the target never ran. The clean path must
 # require explore's ticketedQuarantinesUnskipped flag too, or fail closed into the Fix loop.
