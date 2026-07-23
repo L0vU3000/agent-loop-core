@@ -38,12 +38,13 @@ for dir in pipelines/*/; do
 
   # Syntax check: the Workflow DSL is plain ESM JavaScript, so `node --check`
   # on a .mjs copy validates it without executing anything.
-  # (macOS mktemp appends its random suffix at the END, so the .mjs extension has
-  # to go on a fixed filename inside a temp dir, not on the template itself.)
+  # Use an explicit XXXXXX template inside the platform temp directory. This form
+  # works with both BSD/macOS and GNU/Linux mktemp while keeping the .mjs extension
+  # on a fixed filename inside the generated directory.
   # The Workflow runtime executes the script body inside an async function (top-level
   # `return` and `await` are legal there), so the syntax check wraps it the same way.
   # `export const meta` becomes `const meta` since exports can't live in a function.
-  tmpdir=$(mktemp -d -t "wfcheck-$name")
+  tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/wfcheck-${name}.XXXXXX")
   tmp="$tmpdir/workflow.mjs"
   {
     echo 'async function __wfcheck() {'
