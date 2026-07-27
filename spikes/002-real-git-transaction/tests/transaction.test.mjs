@@ -209,7 +209,7 @@ test('records an unexpected failure and removes registered worktrees and the mak
     assert.ok(existsSync(join(controlPlaneRoot, 'orchestrator', 'evidence', `${runId}.failure.json`)))
     assert.equal(existsSync(join(workspaceRoot, 'maker')), false)
     assert.equal(existsSync(join(workspaceRoot, 'verifier')), false)
-    assert.equal(git(repositoryRoot, 'branch', '--list', `spike-002/${runId}-maker`), '')
+    assert.equal(git(repositoryRoot, 'branch', '--list', `agent-loop/${runId}-maker`), '')
     assert.doesNotMatch(git(repositoryRoot, 'worktree', 'list', '--porcelain'), /runtime-workspaces/)
   } finally {
     rmSync(root, { recursive: true, force: true })

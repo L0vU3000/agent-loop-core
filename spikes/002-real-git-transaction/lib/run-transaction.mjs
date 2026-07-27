@@ -68,6 +68,12 @@ function sha256(value) {
   return createHash('sha256').update(value).digest('hex')
 }
 
+function worktreeIsRegistered(repositoryRoot, workspace) {
+  const listed = command('git', ['worktree', 'list', '--porcelain'], repositoryRoot)
+  if (!listed.passed) return true
+  return listed.stdout.split('\n').includes(`worktree ${workspace}`)
+}
+
 function frozen(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value)) frozen(child)
@@ -176,6 +182,8 @@ export async function runRealGitTransaction({
   workspaceRoot,
   runId,
   rubric,
+  makerExecutor,
+  allowedMakerPaths = ['src/add.mjs'],
 }) {
   if (!runId || safeBranchPart(runId) !== runId) {
     throw new Error('runId must contain at most 80 letters, numbers, dots, underscores, or hyphens')
@@ -191,13 +199,31 @@ export async function runRealGitTransaction({
   ))
   if (rootsOverlap) throw new Error('transaction roots must not overlap or nest')
   if (existsSync(workspaceRoot)) throw new Error('workspace root must not already exist')
+  if (!Array.isArray(allowedMakerPaths) || allowedMakerPaths.length === 0 || allowedMakerPaths.some((path) => (
+    typeof path !== 'string'
+    || path.length === 0
+    || isAbsolute(path)
+    || path === '..'
+    || path.startsWith(`..${sep}`)
+    || path.includes('\\')
+    || path.includes('\0')
+  ))) {
+    throw new Error('allowedMakerPaths must contain safe repository-relative Git paths')
+  }
+
+  const makerBranch = `agent-loop/${safeBranchPart(runId)}-maker`
+  const existingMakerBranch = command('git', ['show-ref', '--verify', '--quiet', `refs/heads/${makerBranch}`], repositoryRoot)
+  if (existingMakerBranch.exitCode === 0) throw new Error('maker branch already exists')
+  if (existingMakerBranch.exitCode !== 1 || existingMakerBranch.spawnError) {
+    throw new Error('could not establish maker branch ownership')
+  }
 
   const claimed = claimNextBugFix(agentLoopRoot)
   if (!claimed) throw new Error('no bug-fix item is available to claim')
 
   const makerWorkspace = join(workspaceRoot, 'maker')
   const verifierWorkspace = join(workspaceRoot, 'verifier')
-  const makerBranch = `spike-002/${safeBranchPart(runId)}-maker`
+  let makerBranchCreated = false
 
   try {
   const claimedItemPath = join(agentLoopRoot, 'orchestrator', 'inbox', 'in-progress', claimed.file)
@@ -223,16 +249,37 @@ export async function runRealGitTransaction({
   if (preflight.verdict !== 'fail') throw new Error('fixture defect was not reproduced at the base commit')
 
   mkdirSync(workspaceRoot, { recursive: true })
-  requireCommand('git', ['worktree', 'add', '-b', makerBranch, makerWorkspace, baseCommit], repositoryRoot)
+  requireCommand('git', ['branch', makerBranch, baseCommit], repositoryRoot)
+  makerBranchCreated = true
+  requireCommand('git', ['worktree', 'add', makerWorkspace, makerBranch], repositoryRoot)
 
-  requireExpectedFixtureDefect(makerWorkspace)
+  let makerRuntime = null
+  if (makerExecutor) {
+    makerRuntime = frozen(await makerExecutor({
+      workspace: makerWorkspace,
+      run,
+      claim: frozen(claimed),
+      workItem,
+    }))
+  } else {
+    requireExpectedFixtureDefect(makerWorkspace)
+    requireCommand('git', ['add', 'src/add.mjs'], makerWorkspace)
+    requireCommand('git', ['commit', '-m', `fix: repair add for ${run.runId}`], makerWorkspace)
+  }
   const makerTest = runTests(makerWorkspace)
   if (!makerTest.passed) throw new Error(`maker result did not pass tests: ${makerTest.stderr || makerTest.stdout}`)
-  requireCommand('git', ['add', 'src/add.mjs'], makerWorkspace)
-  requireCommand('git', ['commit', '-m', `fix: repair add for ${run.runId}`], makerWorkspace)
-  const makerCommit = requireCommand('git', ['rev-parse', 'HEAD'], makerWorkspace)
-  const parentCommit = requireCommand('git', ['rev-parse', 'HEAD^'], makerWorkspace)
-  if (parentCommit !== baseCommit) throw new Error('MAKER_PARENT_COMMIT_MISMATCH')
+  const makerAncestry = requireCommand('git', ['rev-list', '--parents', '-n', '1', 'HEAD'], makerWorkspace).split(/\s+/)
+  const makerCommit = makerAncestry[0]
+  const parentCommit = makerAncestry[1]
+  const commitsAfterBase = requireCommand('git', ['rev-list', '--count', `${baseCommit}..${makerCommit}`], makerWorkspace)
+  if (makerAncestry.length !== 2 || parentCommit !== baseCommit || commitsAfterBase !== '1') {
+    throw new Error('MAKER_COMMIT_NOT_SINGLE_CHILD')
+  }
+  const changedPathsOutput = requireCommand('git', ['diff', '--name-only', '--diff-filter=ACDMRTUXB', `${baseCommit}..${makerCommit}`], makerWorkspace)
+  const changedPaths = changedPathsOutput === '' ? [] : changedPathsOutput.split('\n')
+  if (changedPaths.length === 0 || changedPaths.some((path) => !allowedMakerPaths.includes(path))) {
+    throw new Error('MAKER_CHANGED_UNAPPROVED_PATH')
+  }
   if (requireCommand('git', ['status', '--porcelain'], makerWorkspace) !== '') {
     throw new Error('MAKER_WORKTREE_NOT_CLEAN')
   }
@@ -253,6 +300,8 @@ export async function runRealGitTransaction({
     parentCommit,
     artifactId,
     workspace: makerWorkspace,
+    changedPaths: frozen([...changedPaths]),
+    ...(makerRuntime ? { runtime: makerRuntime } : {}),
   })
 
   let state = lockRubric(createRunState({
@@ -269,7 +318,7 @@ export async function runRealGitTransaction({
     schemaVersion: 1,
     runId: run.runId,
     artifactId: maker.artifactId,
-    verifier: 'spike-002-independent-worktree',
+    verifier: 'independent-git-worktree',
     workspace: verifierWorkspace,
     commit: verifierHead,
     verdict: verifierTest.passed ? 'pass' : 'fail',
@@ -283,16 +332,20 @@ export async function runRealGitTransaction({
   const objectiveHead = requireCommand('git', ['rev-parse', 'HEAD'], verifierWorkspace)
   const exactHead = objectiveHead === maker.commit
   const clean = requireCommand('git', ['status', '--porcelain'], verifierWorkspace) === ''
+  const originalHead = requireCommand('git', ['rev-parse', 'HEAD'], repositoryRoot) === baseCommit
+  const originalClean = requireCommand('git', ['status', '--porcelain'], repositoryRoot) === ''
   const objectiveGate = frozen({
     schemaVersion: 1,
     runId: run.runId,
     artifactId: maker.artifactId,
     commit: objectiveHead,
     checked: true,
-    passed: exactHead && clean && objectiveTest.passed,
+    passed: exactHead && clean && originalHead && originalClean && objectiveTest.passed,
     checks: frozen({
       exactHead,
       clean,
+      originalHead,
+      originalClean,
       tests: objectiveTest.passed,
     }),
   })
@@ -319,12 +372,30 @@ export async function runRealGitTransaction({
   } catch (error) {
     const cleanup = []
     for (const workspace of [verifierWorkspace, makerWorkspace]) {
-      if (!existsSync(workspace)) continue
-      const removed = command('git', ['worktree', 'remove', '--force', workspace], repositoryRoot)
-      cleanup.push({ workspace, removed: removed.passed, error: removed.passed ? null : removed.stderr || removed.spawnError })
+      command('git', ['worktree', 'unlock', workspace], repositoryRoot)
+      const removed = command('git', ['worktree', 'remove', '--force', '--force', workspace], repositoryRoot)
+      cleanup.push({
+        workspace,
+        removedByCommand: removed.passed,
+        errorSha256: removed.passed ? null : sha256(String(removed.stderr || removed.spawnError || 'unknown cleanup failure')),
+      })
     }
-    command('git', ['worktree', 'prune'], repositoryRoot)
-    const deletedBranch = command('git', ['branch', '-D', makerBranch], repositoryRoot)
+    command('git', ['worktree', 'prune', '--expire', 'now'], repositoryRoot)
+    for (const entry of cleanup) entry.registeredAfter = worktreeIsRegistered(repositoryRoot, entry.workspace)
+
+    let deletedBranch = null
+    if (makerBranchCreated) {
+      deletedBranch = command('git', ['branch', '-D', makerBranch], repositoryRoot)
+      if (!deletedBranch.passed) {
+        command('git', ['worktree', 'prune', '--expire', 'now'], repositoryRoot)
+        deletedBranch = command('git', ['branch', '-D', makerBranch], repositoryRoot)
+      }
+    }
+    const makerBranchPresentAfter = command(
+      'git',
+      ['show-ref', '--verify', '--quiet', `refs/heads/${makerBranch}`],
+      repositoryRoot,
+    ).passed
 
     const failureEvidence = {
       schemaVersion: 1,
@@ -335,11 +406,15 @@ export async function runRealGitTransaction({
       },
       decision: 'fail',
       failure: {
-        message: String(error.message ?? error).slice(0, 2000),
+        message: 'transaction failed',
+        errorSha256: sha256(String(error.message ?? error)),
       },
       cleanup: {
         worktrees: cleanup,
-        makerBranchDeleted: deletedBranch.passed || /not found/.test(deletedBranch.stderr),
+        makerBranchDeleted: deletedBranch === null
+          ? false
+          : deletedBranch.passed || /not found/.test(deletedBranch.stderr),
+        makerBranchPresentAfter,
       },
     }
     let persisted = null
