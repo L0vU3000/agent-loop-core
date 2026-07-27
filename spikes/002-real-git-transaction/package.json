@@ -1,0 +1,11 @@
+{
+  "name": "agent-loop-real-git-transaction-spike",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Disposable spike proving one canonical claim-to-record transaction across isolated Git worktrees.",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "demo": "node demo.mjs"
+  }
+}

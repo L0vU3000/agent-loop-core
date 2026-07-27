@@ -1,0 +1,10 @@
+{
+  "name": "agent-loop-real-agent-repair-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "demo": "node demo.mjs --keep"
+  }
+}
