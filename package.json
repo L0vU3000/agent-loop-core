@@ -1,0 +1,20 @@
+{
+  "name": "agent-loop-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agent-loop": "bin/agent-loop.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "npm test && bash scripts/check-machinery.sh"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
