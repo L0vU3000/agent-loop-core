@@ -13,9 +13,14 @@ import {
 } from 'node:path'
 
 const GIT = '/usr/bin/git'
+const HARDENED_GIT_OPTIONS = [
+  '--no-optional-locks',
+  '-c', 'core.fsmonitor=false',
+  '-c', 'core.hooksPath=/dev/null',
+]
 
 function gitOutput(repositoryPath, args, env) {
-  const result = spawnSync(GIT, ['-C', repositoryPath, ...args], {
+  const result = spawnSync(GIT, [...HARDENED_GIT_OPTIONS, '-C', repositoryPath, ...args], {
     encoding: 'utf8',
     env: {
       HOME: env.HOME ?? homedir(),

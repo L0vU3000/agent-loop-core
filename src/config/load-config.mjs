@@ -1,5 +1,13 @@
-import { readFileSync } from 'node:fs'
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  openSync,
+  readSync,
+} from 'node:fs'
 import { posix } from 'node:path'
+
+const MAX_CONFIG_BYTES = 64 * 1024
 
 const TOP_LEVEL_KEYS = new Set(['schemaVersion', 'pipeline', 'test', 'allowedPaths'])
 const TEST_KEYS = new Set(['executable', 'args'])
@@ -60,8 +68,38 @@ function deepFreeze(value) {
   return value
 }
 
+function readConfigFile(configPath) {
+  let descriptor
+  try {
+    descriptor = openSync(
+      configPath,
+      constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW,
+    )
+  } catch {
+    throw new Error('configuration must be a readable regular file')
+  }
+
+  try {
+    const metadata = fstatSync(descriptor)
+    if (!metadata.isFile()) throw new Error('configuration must be a regular file')
+    if (metadata.size > MAX_CONFIG_BYTES) throw new Error('configuration exceeds size limit')
+
+    const buffer = Buffer.alloc(MAX_CONFIG_BYTES + 1)
+    let bytesRead = 0
+    while (bytesRead < buffer.length) {
+      const count = readSync(descriptor, buffer, bytesRead, buffer.length - bytesRead, bytesRead)
+      if (count === 0) break
+      bytesRead += count
+    }
+    if (bytesRead > MAX_CONFIG_BYTES) throw new Error('configuration exceeds size limit')
+    return buffer.toString('utf8', 0, bytesRead)
+  } finally {
+    closeSync(descriptor)
+  }
+}
+
 export function loadConfig(configPath) {
-  const parsed = JSON.parse(readFileSync(configPath, 'utf8'))
+  const parsed = JSON.parse(readConfigFile(configPath))
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error('configuration must be a JSON object')
   }

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
@@ -43,6 +43,26 @@ test('loads, normalizes, and deeply freezes a valid target configuration', () =>
     assert.equal(Object.isFrozen(config.test), true)
     assert.equal(Object.isFrozen(config.test.args), true)
     assert.equal(Object.isFrozen(config.allowedPaths), true)
+  })
+})
+
+test('rejects symbolic-link configuration files before reading them', () => {
+  withTemporaryDirectory((directory) => {
+    const targetPath = join(directory, 'target.json')
+    const configPath = join(directory, 'config.json')
+    writeFileSync(targetPath, JSON.stringify(validConfig()))
+    symlinkSync(targetPath, configPath)
+
+    assert.throws(() => loadConfig(configPath), /regular file/)
+  })
+})
+
+test('rejects oversized configuration files before parsing them', () => {
+  withTemporaryDirectory((directory) => {
+    const configPath = join(directory, 'config.json')
+    writeFileSync(configPath, ' '.repeat((64 * 1024) + 1))
+
+    assert.throws(() => loadConfig(configPath), /size limit/)
   })
 })
 
