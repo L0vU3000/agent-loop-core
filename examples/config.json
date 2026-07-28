@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "pipeline": "bug-fix",
+  "test": {
+    "executable": "node",
+    "args": ["--test"]
+  },
+  "allowedPaths": ["src/add.mjs"]
+}

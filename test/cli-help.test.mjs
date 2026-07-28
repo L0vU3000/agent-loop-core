@@ -157,6 +157,7 @@ test('package archive contains only the maintained runtime surface', () => {
   const paths = archive.files.map((file) => file.path)
   assert.ok(paths.includes('bin/agent-loop.mjs'))
   assert.ok(paths.includes('src/cli/arguments.mjs'))
+  assert.ok(paths.includes('examples/config.json'))
   assert.ok(paths.includes('package.json'))
   assert.equal(
     paths.some((path) => /^(?:\.hermes|orchestrator|pipelines|spikes|vault)\//.test(path)),
