@@ -78,6 +78,7 @@ export function runCommand(executable, args, {
   env = process.env,
   timeout = 10_000,
   maxBuffer = 1024 * 1024,
+  killSignal = 'SIGTERM',
 } = {}) {
   const result = spawnSync(executable, args, {
     cwd,
@@ -85,6 +86,7 @@ export function runCommand(executable, args, {
     env: commandEnvironment(env),
     timeout,
     maxBuffer,
+    killSignal,
     shell: false,
   })
   return Object.freeze({
