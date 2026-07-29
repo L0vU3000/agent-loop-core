@@ -105,6 +105,7 @@ test('separate repositories receive separate complete external state layouts', (
       inProgress: join(first.stateRoot, 'inbox', 'in-progress'),
       done: join(first.stateRoot, 'inbox', 'done'),
       failed: join(first.stateRoot, 'inbox', 'failed'),
+      claims: join(first.stateRoot, 'claims'),
       runs: join(first.stateRoot, 'runs'),
       evidence: join(first.stateRoot, 'evidence'),
       dispatchLog: join(first.stateRoot, 'logs', 'dispatch.jsonl'),

@@ -108,6 +108,7 @@ export function deriveRepositoryState({ repositoryPath, stateRoot, env = process
     inProgress: join(resolvedStateRoot, 'inbox', 'in-progress'),
     done: join(resolvedStateRoot, 'inbox', 'done'),
     failed: join(resolvedStateRoot, 'inbox', 'failed'),
+    claims: join(resolvedStateRoot, 'claims'),
     runs: join(resolvedStateRoot, 'runs'),
     evidence: join(resolvedStateRoot, 'evidence'),
     dispatchLog: join(resolvedStateRoot, 'logs', 'dispatch.jsonl'),
