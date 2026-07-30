@@ -1,15 +1,21 @@
 # agent-loop-core
 
-A reusable, self-improving agent-loop: many peer pipelines organized by category,
-each owning `explore → plan → execute → eval` with a separate verifier, driven by an
-orchestrator that dispatches work items from an inbox. Zero npm dependencies — pure
-Node built-ins.
+A reusable, self-improving agent loop with two deliberately separate operating surfaces:
 
-This repo is a **template you copy into a project**, not a library you link. Pipelines
-get tuned per project (that's the point), so each project owns its copy and diverges
-freely. See `agent-loop.md` for the operating principles.
+1. the **supported package-based transaction runtime**, which installs as the `agent-loop` CLI and
+   runs one bounded bug-fix transaction against an external Git repository; and
+2. the **legacy copy-owned template**, which supplies the broader peer-pipeline/orchestrator system
+   that consuming projects can copy and tune.
 
-## What travels vs what stays
+The installed runtime has zero npm dependencies and uses Node built-ins. The legacy template keeps
+its existing `explore → plan → execute → eval` pipelines and separate verifier. See
+`agent-loop.md` for those operating principles.
+
+The package runtime is the supported path for new external repair transactions. The `degit` path is
+legacy and remains available for projects that intentionally want to own and diverge from a full
+copy of the template.
+
+## Legacy template: what travels vs what stays
 
 | Travels (this repo — the "core") | Stays per-project (git-ignored here) |
 |---|---|
@@ -18,10 +24,43 @@ freely. See `agent-loop.md` for the operating principles.
 | `categories.md`, `agent-loop.md`, docs | `memory/run-metrics.jsonl`, `.heartbeat`, dispatch log |
 | `memory/*` as **empty templates** | the accumulated entries you write into them |
 
-## Use it in a new project
+## Install the supported transaction runtime
+
+The package is not currently published to npm. Build a local tarball from this repository, then
+install it under a dedicated tools prefix outside the target repository:
 
 ```bash
-# 1. Copy the core in, one level under your repo root
+cd /path/to/agent-loop-core
+npm pack --json
+npm install --prefix /absolute/path/to/agent-loop-tools ./agent-loop-core-0.1.0.tgz
+
+AGENT_LOOP=/absolute/path/to/agent-loop-tools/node_modules/.bin/agent-loop
+$AGENT_LOOP doctor \
+  --repo /absolute/path/to/target \
+  --state-root /absolute/path/to/agent-loop-state \
+  --json
+
+$AGENT_LOOP run \
+  --repo /absolute/path/to/target \
+  --state-root /absolute/path/to/agent-loop-state \
+  --work-item /absolute/path/to/bug-fix.md \
+  --acknowledge-unsandboxed-credential-access \
+  --json
+```
+
+The target owns `.agent-loop/config.json`; claims, evidence, worktrees, and logs belong under the
+separate state root. The first productized slice runs only a bounded `bug-fix` work item, creates no
+remote Git operation, and never pushes or merges. The Hermes maker is not OS-sandboxed: use only a
+disposable or trusted non-production target, keep credentials out of target configuration, and
+acknowledge the inherited credential access explicitly.
+
+See the installation and operating guides in `vault/operations/` for configuration, ownership,
+upgrade, and uninstall details.
+
+## Use the legacy template in a new project
+
+```bash
+# 1. Copy the legacy template in, one level under your repo root
 cd /path/to/your-project
 npx degit your-org/agent-loop-core agent-loop
 
@@ -94,8 +133,8 @@ agent-loop/
 eval scoring, metrics, and knowledge-vault invariants. Run it after touching machinery or
 curated knowledge. It needs Node ≥ a version with `node:test` (Node 18+).
 
-## Updating the core across projects
+## Updating the legacy template across projects
 
-Copy-and-own, not submodule. When you fix the machinery here, re-copy the changed
+The legacy template remains copy-and-own, not a submodule. When you fix its machinery here, re-copy the changed
 `.mjs`/`scripts` files into each consuming project. If you ever run 3+ projects that all
 need the same machinery fixes fast, revisit a git-subtree link — until then, copy wins.

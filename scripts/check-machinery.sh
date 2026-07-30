@@ -307,6 +307,15 @@ grep -q -- '--approve-release' pipelines/release/workflow.js \
   && good "release: release approval, final sign-off, and verified prerequisite boundary present" \
   || bad "release: release approval, final sign-off, or verified prerequisite boundary missing"
 
+# --- productized transaction runtime documentation ------------------------------
+# The package runtime and legacy copy-owned template must stay explicitly separated. The
+# operational docs are executable contracts for install, state ownership, safety, and removal.
+if node scripts/check-product-runtime-docs.mjs; then
+  good "product runtime distribution and operating boundaries are documented"
+else
+  bad "product runtime documentation drifted"
+fi
+
 # --- 4: run state must be gitignored --------------------------------------------
 probe="pipelines/eslint-burndown/runs/_ignore-probe"
 if git check-ignore -q "$probe"; then
