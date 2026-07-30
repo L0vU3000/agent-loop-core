@@ -49,6 +49,7 @@ function createBrokenRepository(repositoryRoot, {
   initiallyPassing = false,
   mutateFirstTestRun = false,
   poisonGitConfig = false,
+  unapprovedFile = false,
 } = {}) {
   mkdirSync(join(repositoryRoot, 'src'), { recursive: true })
   mkdirSync(join(repositoryRoot, 'test'), { recursive: true })
@@ -61,6 +62,9 @@ function createBrokenRepository(repositoryRoot, {
   }
   if (poisonGitConfig) {
     writeFileSync(join(repositoryRoot, '.gitconfig'), '[invalid config\n')
+  }
+  if (unapprovedFile) {
+    writeFileSync(join(repositoryRoot, 'unapproved.mjs'), 'export const privateValue = 1\n')
   }
   const invocationCounterPath = join(repositoryRoot, '..', 'test-invocations')
   writeFileSync(join(repositoryRoot, 'test', 'add.test.mjs'), `
@@ -111,7 +115,7 @@ function fixture(directory, options = {}) {
     schemaVersion: 1,
     pipeline: 'bug-fix',
     test: Object.freeze({ executable: process.execPath, args: Object.freeze(['--test']) }),
-    allowedPaths: Object.freeze(['src/add.mjs']),
+    allowedPaths: Object.freeze(options.allowedPaths ?? ['src/add.mjs']),
   })
   return { repositoryRoot, baseCommit, state, claim, run, config }
 }
@@ -240,6 +244,59 @@ test('rejects unapproved maker paths and cleans every run-owned Git resource', a
     assert.equal(
       git(repositoryRoot, 'worktree', 'list', '--porcelain').includes(join(state.paths.worktrees, run.runId)),
       false,
+    )
+  })
+})
+
+test('rejects a rename from an unapproved source into an approved destination', async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const { repositoryRoot, state, claim, run, config } = fixture(directory, {
+      runId: 'run-unapproved-rename-source',
+      unapprovedFile: true,
+      allowedPaths: ['src/add.mjs', 'copy.mjs'],
+    })
+
+    await assert.rejects(
+      () => runGitTransaction({
+        repositoryRoot,
+        paths: state.paths,
+        run,
+        workItem: claim.content,
+        config,
+        makerExecutor: async ({ workspace }) => {
+          writeFileSync(join(workspace, 'src', 'add.mjs'), 'export function add(a, b) { return a + b }\n')
+          git(workspace, 'mv', 'unapproved.mjs', 'copy.mjs')
+          git(workspace, 'add', 'src/add.mjs')
+          git(workspace, '-c', 'user.name=Maker', '-c', 'user.email=maker@example.invalid', 'commit', '--quiet', '-m', 'unsafe rename repair')
+        },
+      }),
+      (error) => error.code === 'MAKER_CHANGED_UNAPPROVED_PATH',
+    )
+  })
+})
+
+test('rejects a maker path whose leading space would alias an approved path after trimming', async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const { repositoryRoot, state, claim, run, config } = fixture(directory, {
+      runId: 'run-leading-space-path',
+    })
+
+    await assert.rejects(
+      () => runGitTransaction({
+        repositoryRoot,
+        paths: state.paths,
+        run,
+        workItem: claim.content,
+        config,
+        makerExecutor: async ({ workspace }) => {
+          mkdirSync(join(workspace, ' src'))
+          writeFileSync(join(workspace, ' src', 'add.mjs'), 'export const decoy = true\n')
+          writeFileSync(join(workspace, 'src', 'add.mjs'), 'export function add(a, b) { return a + b }\n')
+          git(workspace, 'add', ' src/add.mjs', 'src/add.mjs')
+          git(workspace, '-c', 'user.name=Maker', '-c', 'user.email=maker@example.invalid', 'commit', '--quiet', '-m', 'unsafe leading-space repair')
+        },
+      }),
+      (error) => error.code === 'MAKER_CHANGED_UNAPPROVED_PATH',
     )
   })
 })
@@ -459,6 +516,10 @@ test('cleans a registered worktree whose directory disappears during maker failu
     const { repositoryRoot, state, claim, run, config } = fixture(directory, {
       runId: 'run-missing-worktree',
     })
+    const unrelatedWorktree = join(directory, 'unrelated-missing-worktree')
+    git(repositoryRoot, 'worktree', 'add', '--detach', unrelatedWorktree, run.baseCommit)
+    rmSync(unrelatedWorktree, { recursive: true, force: true })
+    assert.equal(git(repositoryRoot, 'worktree', 'list', '--porcelain').includes(unrelatedWorktree), true)
 
     await assert.rejects(
       () => runGitTransaction({
@@ -480,6 +541,10 @@ test('cleans a registered worktree whose directory disappears during maker failu
     assert.equal(
       git(repositoryRoot, 'worktree', 'list', '--porcelain').includes(join(state.paths.worktrees, run.runId)),
       false,
+    )
+    assert.equal(
+      git(repositoryRoot, 'worktree', 'list', '--porcelain').includes(unrelatedWorktree),
+      true,
     )
   })
 })

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { join } from 'node:path'
+import { existsSync, realpathSync, rmSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
 import { prepareStateDirectory } from '../paths/state-mutation.mjs'
 import { runCommand } from './command.mjs'
@@ -54,31 +55,56 @@ function gitResult(repositoryRoot, args, commandRunner) {
   )
 }
 
-function requireResult(result, code) {
+function requireResult(result, code, { trim = true } = {}) {
   if (result.status !== 0 || result.errorCode !== null) {
     throw new GitTransactionError(code, `${result.status}\0${result.errorCode}\0${result.stderr}\0${result.stdout}`)
   }
-  return result.stdout.trim()
+  return trim ? result.stdout.trim() : result.stdout
 }
 
 function requireGit(repositoryRoot, args, code, commandRunner) {
   return requireResult(gitResult(repositoryRoot, args, commandRunner), code)
 }
 
+function requireGitRaw(repositoryRoot, args, code, commandRunner) {
+  return requireResult(gitResult(repositoryRoot, args, commandRunner), code, { trim: false })
+}
+
 function runConfiguredTests(workspace, config, commandRunner) {
   return execute(config.test.executable, config.test.args, workspace, commandRunner)
 }
 
-function cleanupWorktrees(repositoryRoot, workspaces, commandRunner) {
-  for (const workspace of workspaces) {
-    gitResult(repositoryRoot, ['worktree', 'unlock', workspace], commandRunner)
-    gitResult(repositoryRoot, ['worktree', 'remove', '--force', '--force', workspace], commandRunner)
+function resolveOwnedWorktreeAdmin(repositoryRoot, workspace, commandRunner) {
+  const commonDirectory = realpathSync(requireGit(
+    repositoryRoot,
+    ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+    'WORKTREE_OWNERSHIP_UNAVAILABLE',
+    commandRunner,
+  ))
+  const adminDirectory = realpathSync(requireGit(
+    workspace,
+    ['rev-parse', '--absolute-git-dir'],
+    'WORKTREE_OWNERSHIP_UNAVAILABLE',
+    commandRunner,
+  ))
+  if (dirname(adminDirectory) !== join(commonDirectory, 'worktrees')) {
+    throw new GitTransactionError('WORKTREE_OWNERSHIP_UNAVAILABLE', adminDirectory)
   }
-  gitResult(repositoryRoot, ['worktree', 'prune', '--expire', 'now'], commandRunner)
+  return adminDirectory
 }
 
-function cleanupOwnedTransaction(repositoryRoot, makerBranch, workspaces, commandRunner) {
-  cleanupWorktrees(repositoryRoot, workspaces, commandRunner)
+function cleanupWorktrees(repositoryRoot, worktrees, commandRunner) {
+  for (const { workspace, adminDirectory } of worktrees) {
+    gitResult(repositoryRoot, ['worktree', 'unlock', workspace], commandRunner)
+    gitResult(repositoryRoot, ['worktree', 'remove', '--force', '--force', workspace], commandRunner)
+    if (adminDirectory !== null && existsSync(adminDirectory)) {
+      rmSync(adminDirectory, { recursive: true, force: true })
+    }
+  }
+}
+
+function cleanupOwnedTransaction(repositoryRoot, makerBranch, worktrees, commandRunner) {
+  cleanupWorktrees(repositoryRoot, worktrees, commandRunner)
   gitResult(repositoryRoot, ['branch', '-D', makerBranch], commandRunner)
 }
 
@@ -125,6 +151,7 @@ export async function runGitTransaction({
   const verifierWorkspace = join(runWorktrees, 'verifier')
 
   let preflightResult
+  let preflightAdminDirectory = null
   try {
     requireGit(
       repositoryRoot,
@@ -132,9 +159,13 @@ export async function runGitTransaction({
       'PREFLIGHT_WORKTREE_CREATE_FAILED',
       commandRunner,
     )
+    preflightAdminDirectory = resolveOwnedWorktreeAdmin(repositoryRoot, preflightWorkspace, commandRunner)
     preflightResult = runConfiguredTests(preflightWorkspace, config, commandRunner)
   } finally {
-    cleanupWorktrees(repositoryRoot, [preflightWorkspace], commandRunner)
+    cleanupWorktrees(repositoryRoot, [{
+      workspace: preflightWorkspace,
+      adminDirectory: preflightAdminDirectory,
+    }], commandRunner)
   }
   if (
     preflightResult.errorCode !== null
@@ -161,6 +192,8 @@ export async function runGitTransaction({
     commandRunner,
   )
 
+  let makerAdminDirectory = null
+  let verifierAdminDirectory = null
   try {
   requireGit(
     repositoryRoot,
@@ -168,6 +201,7 @@ export async function runGitTransaction({
     'MAKER_WORKTREE_CREATE_FAILED',
     commandRunner,
   )
+  makerAdminDirectory = resolveOwnedWorktreeAdmin(repositoryRoot, makerWorkspace, commandRunner)
 
   try {
     await makerExecutor({ workspace: makerWorkspace, run, workItem, config })
@@ -197,13 +231,16 @@ export async function runGitTransaction({
     throw new GitTransactionError('MAKER_COMMIT_NOT_SINGLE_CHILD', ancestry.join(' '))
   }
 
-  const changedOutput = requireGit(
+  const changedOutput = requireGitRaw(
     makerWorkspace,
-    ['diff', '--name-only', '--diff-filter=ACDMRTUXB', `${run.baseCommit}..${makerCommit}`],
+    ['diff', '--no-renames', '--name-only', '-z', '--diff-filter=ACDMRTUXB', `${run.baseCommit}..${makerCommit}`],
     'MAKER_DIFF_UNAVAILABLE',
     commandRunner,
   )
-  const changedPaths = changedOutput === '' ? [] : changedOutput.split('\n')
+  if (changedOutput !== '' && !changedOutput.endsWith('\0')) {
+    throw new GitTransactionError('MAKER_DIFF_MALFORMED')
+  }
+  const changedPaths = changedOutput === '' ? [] : changedOutput.slice(0, -1).split('\0')
   if (changedPaths.length === 0 || changedPaths.some((path) => !config.allowedPaths.includes(path))) {
     throw new GitTransactionError('MAKER_CHANGED_UNAPPROVED_PATH', changedPaths.join('\0'))
   }
@@ -232,6 +269,7 @@ export async function runGitTransaction({
     'VERIFIER_WORKTREE_CREATE_FAILED',
     commandRunner,
   )
+  verifierAdminDirectory = resolveOwnedWorktreeAdmin(repositoryRoot, verifierWorkspace, commandRunner)
   const verifierHead = requireGit(
     verifierWorkspace,
     ['rev-parse', 'HEAD'],
@@ -277,7 +315,10 @@ export async function runGitTransaction({
     },
   })
   } catch (error) {
-    cleanupOwnedTransaction(repositoryRoot, makerBranch, [verifierWorkspace, makerWorkspace], commandRunner)
+    cleanupOwnedTransaction(repositoryRoot, makerBranch, [
+      { workspace: verifierWorkspace, adminDirectory: verifierAdminDirectory },
+      { workspace: makerWorkspace, adminDirectory: makerAdminDirectory },
+    ], commandRunner)
     if (error instanceof GitTransactionError) throw error
     throw new GitTransactionError('TRANSACTION_FAILED', String(error?.message ?? error))
   }
