@@ -11,15 +11,33 @@ import {
   rmdirSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { TextDecoder } from 'node:util'
 
+import {
+  openChildDirectoryNoFollow,
+  openExistingDirectoryNoFollow,
+  readUtf8RegularFileAt,
+} from '../paths/state-access.mjs'
 import { prepareStateDirectory } from '../paths/state-mutation.mjs'
 
 const HEX64 = /^[a-f0-9]{64}$/
+const REPOSITORY_KEY = /^[a-f0-9]{24}$/
 const COMMIT = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
-const RUN_KEYS = ['schemaVersion', 'runId', 'baseCommit', 'configDigest', 'workItemDigest']
+const RUN_KEYS = ['schemaVersion', 'runId', 'repositoryKey', 'baseCommit', 'configDigest', 'workItemDigest']
+const EVIDENCE_KEYS = [
+  'schemaVersion',
+  'runId',
+  'repositoryKey',
+  'baseCommit',
+  'configDigest',
+  'workItemDigest',
+  'maker',
+  'verifier',
+  'objectiveGate',
+  'decision',
+]
 const MAX_EVIDENCE_BYTES = 256 * 1024
 const MAX_LEDGER_BYTES = 16 * 1024 * 1024
 const OBJECTIVE_CHECK_IDS = Object.freeze([
@@ -59,9 +77,13 @@ function readUtf8RegularFileNoFollow(filePath, maximumBytes, label) {
   }
 }
 
-function ledgerContains(paths, runId, evidenceDigest) {
-  if (!existsSync(paths.dispatchLog)) return false
-  const text = readUtf8RegularFileNoFollow(paths.dispatchLog, MAX_LEDGER_BYTES, 'dispatch ledger')
+function ledgerContains(paths, runId, evidenceDigest, expectedRecord = null, ledgerText = undefined) {
+  if (ledgerText === undefined && !existsSync(paths.dispatchLog)) return false
+  const text = ledgerText ?? readUtf8RegularFileNoFollow(
+    paths.dispatchLog,
+    MAX_LEDGER_BYTES,
+    'dispatch ledger',
+  )
   let matches = 0
   for (const line of text.split('\n')) {
     if (line.length === 0) continue
@@ -73,6 +95,15 @@ function ledgerContains(paths, runId, evidenceDigest) {
     }
     if (entry.runId !== runId) continue
     if (entry.evidenceDigest !== evidenceDigest) throw new Error(`LEDGER_CONFLICT: ${runId}`)
+    if (expectedRecord !== null) {
+      requireOnlyKeys(entry, [...EVIDENCE_KEYS, 'evidenceDigest'], 'dispatch ledger entry')
+      const { evidenceDigest: normalizedDigest, ...evidenceFields } = entry
+      if (!HEX64.test(normalizedDigest)) throw new Error('dispatch ledger evidenceDigest must be a sha256 hex digest')
+      const normalizedEntry = normalizeEvidenceRecord(evidenceFields)
+      if (JSON.stringify(normalizedEntry) !== JSON.stringify(expectedRecord)) {
+        throw new Error(`LEDGER_CONFLICT: ${runId}`)
+      }
+    }
     matches += 1
   }
   if (matches > 1) throw new Error(`LEDGER_DUPLICATE: ${runId}`)
@@ -113,12 +144,14 @@ function normalizeRunIdentity(run) {
   if (run.schemaVersion !== 1) throw new Error('run.schemaVersion must be 1')
   assertNonEmptyString(run.runId, 'runId')
   if (!RUN_ID.test(run.runId)) throw new Error('runId must be a safe identifier')
+  if (!REPOSITORY_KEY.test(run.repositoryKey)) throw new Error('repositoryKey must be a repository identity')
   if (!COMMIT.test(run.baseCommit)) throw new Error('baseCommit must be a Git commit hash')
   if (!HEX64.test(run.configDigest)) throw new Error('configDigest must be a sha256 hex digest')
   if (!HEX64.test(run.workItemDigest)) throw new Error('workItemDigest must be a sha256 hex digest')
   return Object.freeze({
     schemaVersion: 1,
     runId: run.runId,
+    repositoryKey: run.repositoryKey,
     baseCommit: run.baseCommit,
     configDigest: run.configDigest,
     workItemDigest: run.workItemDigest,
@@ -224,10 +257,11 @@ function normalizeObjectiveGate(objectiveGate) {
 // One run identity, created exactly once. runId is the sole dedup key: creating a run directory
 // is an atomic mkdir, so a second call with the same runId always fails closed, identical inputs
 // or not — a run is never silently reused.
-export function createRunIdentity({ paths, runId, baseCommit, configDigest, workItemDigest }) {
+export function createRunIdentity({ paths, runId, repositoryKey, baseCommit, configDigest, workItemDigest }) {
   const identity = normalizeRunIdentity({
     schemaVersion: 1,
     runId,
+    repositoryKey,
     baseCommit,
     configDigest,
     workItemDigest,
@@ -266,6 +300,113 @@ export function assertEvidenceBinding(run, maker, verifier, objectiveGate) {
   if (maker.parentCommit !== run.baseCommit) throw new Error('MAKER_PARENT_MISMATCH')
 }
 
+function normalizeEvidenceRecord(record) {
+  requireOnlyKeys(record, EVIDENCE_KEYS, 'evidence')
+  if (record.schemaVersion !== 1) throw new Error('evidence.schemaVersion must be 1')
+  const run = normalizeRunIdentity({
+    schemaVersion: record.schemaVersion,
+    runId: record.runId,
+    repositoryKey: record.repositoryKey,
+    baseCommit: record.baseCommit,
+    configDigest: record.configDigest,
+    workItemDigest: record.workItemDigest,
+  })
+  const maker = normalizeMaker(record.maker)
+  const verifier = normalizeVerifier(record.verifier)
+  const objectiveGate = normalizeObjectiveGate(record.objectiveGate)
+  if (record.decision !== 'pass' && record.decision !== 'fail') {
+    throw new Error('evidence.decision must be "pass" or "fail"')
+  }
+  assertEvidenceBinding(run, maker, verifier, objectiveGate)
+  if (
+    record.decision === 'pass'
+    && !(verifier.verdict === 'pass' && objectiveGate.checked && objectiveGate.passed)
+  ) {
+    throw new Error('DECISION_PASS_REQUIRES_PASSING_VERIFIER_AND_OBJECTIVE_GATE')
+  }
+  return Object.freeze({
+    ...run,
+    maker,
+    verifier,
+    objectiveGate,
+    decision: record.decision,
+  })
+}
+
+// Read an already-canonical outcome for deterministic recovery. Both immutable files are parsed,
+// normalized, reserialized, and matched to the append-only ledger before any queue transition is
+// allowed. Recovery therefore cannot infer success from a partial or conflicting write.
+export function loadRecordedEvidence({ paths, runId }) {
+  if (!RUN_ID.test(runId)) throw new Error('runId must be a safe identifier')
+  let runsDescriptor
+  let runDescriptor
+  let evidenceDescriptor
+  let logsDescriptor
+  try {
+    runsDescriptor = openExistingDirectoryNoFollow(paths.runs)
+    runDescriptor = openChildDirectoryNoFollow(runsDescriptor, runId)
+    evidenceDescriptor = openExistingDirectoryNoFollow(paths.evidence)
+    logsDescriptor = openExistingDirectoryNoFollow(dirname(paths.dispatchLog))
+
+    const stateText = readUtf8RegularFileAt(
+      runDescriptor,
+      'state.json',
+      MAX_EVIDENCE_BYTES,
+      'run state',
+    )
+    let run
+    try {
+      run = normalizeRunIdentity(JSON.parse(stateText))
+    } catch (error) {
+      throw new Error(`run state is invalid: ${error.message}`)
+    }
+    if (run.runId !== runId) throw new Error('RUN_ID_MISMATCH: state')
+    if (stateText !== `${JSON.stringify(run, null, 2)}\n`) {
+      throw new Error('run state is not canonical')
+    }
+
+    const evidenceName = `${runId}.json`
+    const serialized = readUtf8RegularFileAt(
+      evidenceDescriptor,
+      evidenceName,
+      MAX_EVIDENCE_BYTES,
+      'evidence',
+    )
+    let record
+    try {
+      record = normalizeEvidenceRecord(JSON.parse(serialized))
+    } catch (error) {
+      throw new Error(`evidence is invalid: ${error.message}`)
+    }
+    if (record.runId !== runId) throw new Error('RUN_ID_MISMATCH: evidence')
+    for (const key of ['repositoryKey', 'baseCommit', 'configDigest', 'workItemDigest']) {
+      if (record[key] !== run[key]) throw new Error(`RUN_IDENTITY_MISMATCH: ${key}`)
+    }
+    const canonical = `${JSON.stringify(record, null, 2)}\n`
+    if (serialized !== canonical) throw new Error('evidence is not canonical')
+    const evidenceDigest = createHash('sha256').update(serialized).digest('hex')
+    const ledgerText = readUtf8RegularFileAt(
+      logsDescriptor,
+      basename(paths.dispatchLog),
+      MAX_LEDGER_BYTES,
+      'dispatch ledger',
+    )
+    if (!ledgerContains(paths, runId, evidenceDigest, record, ledgerText)) {
+      throw new Error(`LEDGER_ENTRY_MISSING: ${runId}`)
+    }
+    return Object.freeze({
+      run,
+      record,
+      evidencePath: join(paths.evidence, evidenceName),
+      evidenceDigest,
+    })
+  } finally {
+    for (const descriptor of [logsDescriptor, evidenceDescriptor, runDescriptor, runsDescriptor]) {
+      if (descriptor !== undefined) closeSync(descriptor)
+    }
+  }
+}
+
 // Bind run + maker + verifier + objective gate into one normalized record, then append it to the
 // external, append-only JSONL ledger. Each artifact is validated against its explicit minimal
 // schema (unknown fields rejected recursively) so the ledger only ever stores normalized outcomes,
@@ -299,6 +440,7 @@ export function recordEvidence(
   const record = Object.freeze({
     schemaVersion: 1,
     runId: normalizedRun.runId,
+    repositoryKey: normalizedRun.repositoryKey,
     baseCommit: normalizedRun.baseCommit,
     configDigest: normalizedRun.configDigest,
     workItemDigest: normalizedRun.workItemDigest,
@@ -331,7 +473,7 @@ export function recordEvidence(
       if (existing !== serialized) throw new Error(`EVIDENCE_CONFLICT: ${normalizedRun.runId}`)
     }
 
-    if (!ledgerContains(paths, normalizedRun.runId, evidenceDigest)) {
+    if (!ledgerContains(paths, normalizedRun.runId, evidenceDigest, record)) {
       appendLedger(
         paths.dispatchLog,
         `${JSON.stringify({ ...record, evidenceDigest })}\n`,

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import {
   appendFileSync,
   existsSync,
@@ -27,6 +27,7 @@ import { createRunIdentity, recordEvidence } from '../src/core/evidence.mjs'
 import { deriveRepositoryState } from '../src/paths/repository-state.mjs'
 
 const WORK_ITEM_CONTENT = '---\npipeline: bug-fix\n---\nFix the defect described here. Stay within configured allowed paths.\n'
+const REPOSITORY_KEY = 'f'.repeat(24)
 const BASE_COMMIT = 'a'.repeat(40)
 const CONFIG_DIGEST = createHash('sha256').update('config-fixture').digest('hex')
 const PASSING_OBJECTIVE_CHECKS = Object.freeze({
@@ -94,6 +95,27 @@ function withTemporaryDirectory(run) {
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
+}
+
+async function waitForPath(pathname) {
+  const deadline = Date.now() + 5_000
+  while (!existsSync(pathname)) {
+    if (Date.now() >= deadline) throw new Error(`timed out waiting for ${pathname}`)
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
+function waitForChild(child) {
+  return new Promise((resolve, reject) => {
+    let stdout = ''
+    let stderr = ''
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk) => { stdout += chunk })
+    child.stderr.on('data', (chunk) => { stderr += chunk })
+    child.once('error', reject)
+    child.once('close', (code, signal) => resolve({ code, signal, stdout, stderr }))
+  })
 }
 
 function runGit(repositoryPath, args) {
@@ -256,6 +278,59 @@ test('a failing outcome moves the claimed item to failed', () => {
   })
 })
 
+test('concurrent opposite outcomes reserve exactly one canonical terminal decision', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'agent-loop-opposite-outcome-test-'))
+  try {
+    const { paths, workItemPath } = fixture(directory)
+    const claim = claimWorkItem({ paths, workItemPath })
+    const startPath = join(directory, 'start')
+    const readyPaths = [join(directory, 'pass-ready'), join(directory, 'fail-ready')]
+    const moduleUrl = new URL('../src/core/work-items.mjs', import.meta.url).href
+    const childSource = `
+      import { existsSync, writeFileSync } from 'node:fs'
+      import { resolveWorkItem } from ${JSON.stringify(moduleUrl)}
+      const [pathsJson, digest, outcome, readyPath, startPath] = process.argv.slice(1)
+      writeFileSync(readyPath, '')
+      const waitBuffer = new Int32Array(new SharedArrayBuffer(4))
+      while (!existsSync(startPath)) Atomics.wait(waitBuffer, 0, 0, 5)
+      try {
+        resolveWorkItem({ paths: JSON.parse(pathsJson), workItemDigest: digest, outcome })
+        process.stdout.write('resolved')
+      } catch (error) {
+        process.stderr.write(error.message)
+        process.exitCode = 1
+      }
+    `
+    const children = ['pass', 'fail'].map((outcome, index) => spawn(process.execPath, [
+      '--input-type=module',
+      '-e',
+      childSource,
+      JSON.stringify(paths),
+      claim.workItemDigest,
+      outcome,
+      readyPaths[index],
+      startPath,
+    ], { stdio: ['ignore', 'pipe', 'pipe'] }))
+
+    await Promise.all(readyPaths.map(waitForPath))
+    writeFileSync(startPath, '')
+    const results = await Promise.all(children.map(waitForChild))
+
+    assert.deepEqual(results.map((result) => result.code).sort(), [0, 1])
+    const rejected = results.find((result) => result.code === 1)
+    assert.match(rejected.stderr, /WORK_ITEM_OUTCOME_CONFLICT/)
+    assert.equal(existsSync(claim.claimedPath), false)
+    const terminalPaths = [
+      join(paths.done, `${claim.workItemDigest}.md`),
+      join(paths.failed, `${claim.workItemDigest}.md`),
+    ]
+    assert.equal(terminalPaths.filter(existsSync).length, 1)
+    assert.equal(readFileSync(terminalPaths.find(existsSync), 'utf8'), WORK_ITEM_CONTENT)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('resolving fails closed instead of replacing a pre-existing outcome', () => {
   withTemporaryDirectory((directory) => {
     const { paths, workItemPath } = fixture(directory)
@@ -360,6 +435,7 @@ test('run identity binds runId, baseCommit, config digest, and work-item digest 
     const identity = createRunIdentity({
       paths,
       runId: 'run-001',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -368,6 +444,7 @@ test('run identity binds runId, baseCommit, config digest, and work-item digest 
     assert.deepEqual(identity, {
       schemaVersion: 1,
       runId: 'run-001',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -388,6 +465,7 @@ test('fails closed on a duplicate run ID even with identical inputs', () => {
     const identityInput = {
       paths,
       runId: 'run-duplicate',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -406,6 +484,7 @@ test('recording evidence rejects a forged unsafe run identity before constructin
     const forgedRun = {
       schemaVersion: 1,
       runId: '../escape',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -427,6 +506,7 @@ test('evidence binds run, maker artifact, verifier, and objective gate together'
     const run = createRunIdentity({
       paths,
       runId: 'run-evidence',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -456,6 +536,7 @@ test('rejects evidence whose maker/verifier/objective-gate run ID does not match
     const run = createRunIdentity({
       paths,
       runId: 'run-mismatch',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -479,6 +560,7 @@ test('rejects evidence whose verifier or objective-gate commit disagrees with th
     const run = createRunIdentity({
       paths,
       runId: 'run-commit-mismatch',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -501,6 +583,7 @@ test('rejects evidence whose maker parent is not the immutable run base commit',
     const run = createRunIdentity({
       paths,
       runId: 'run-parent-mismatch',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -529,6 +612,7 @@ test('the append-only ledger rejects raw model/error output fields', () => {
     const run = createRunIdentity({
       paths,
       runId: 'run-raw-output',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -556,6 +640,7 @@ test('rejects unknown fields anywhere in maker, verifier, or objective-gate evid
     const run = createRunIdentity({
       paths,
       runId: 'run-unknown-fields',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -610,6 +695,7 @@ test('rejects a non-boolean value nested inside the objective-gate checks map', 
     const run = createRunIdentity({
       paths,
       runId: 'run-checks-not-boolean',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -638,6 +724,7 @@ test('rejects objective-gate check IDs outside the fixed transaction allowlist',
     const run = createRunIdentity({
       paths,
       runId: 'run-unsafe-check-name',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -669,6 +756,7 @@ test('requires every fixed objective-gate check ID so passing evidence cannot om
     const run = createRunIdentity({
       paths,
       runId: 'run-missing-objective-check',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -699,6 +787,7 @@ test('rejects a maker artifactId that is not a sha256 hex digest', () => {
     const run = createRunIdentity({
       paths,
       runId: 'run-bad-artifact-id',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -721,6 +810,7 @@ test('rejects a verifier or objective-gate artifactId that does not match the ma
     const run = createRunIdentity({
       paths,
       runId: 'run-artifact-mismatch',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -753,6 +843,7 @@ test('rejects a maker, verifier, or objective-gate commit that is not a valid Gi
     const run = createRunIdentity({
       paths,
       runId: 'run-invalid-commit',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -784,6 +875,7 @@ test('rejects a pass decision unless the verifier verdict is pass', () => {
     const run = createRunIdentity({
       paths,
       runId: 'run-decision-needs-pass-verdict',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -806,6 +898,7 @@ test('rejects a pass decision unless the objective gate is both checked and pass
     const run = createRunIdentity({
       paths,
       runId: 'run-decision-needs-objective-gate',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -837,6 +930,7 @@ test('rejects a pass decision when any normalized objective check is false', () 
     const run = createRunIdentity({
       paths,
       runId: 'run-false-objective-check',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -869,6 +963,7 @@ test('rejects evidence over 256 KiB before creating an evidence file or ledger',
     const run = createRunIdentity({
       paths,
       runId: 'run-oversized-evidence',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -906,6 +1001,7 @@ test('evidence is appended to the JSONL ledger without disturbing prior lines', 
     const runOne = createRunIdentity({
       paths,
       runId: 'run-ledger-one',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -924,6 +1020,7 @@ test('evidence is appended to the JSONL ledger without disturbing prior lines', 
     const runTwo = createRunIdentity({
       paths,
       runId: 'run-ledger-two',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: secondClaim.workItemDigest,
@@ -951,6 +1048,7 @@ test('evidence recording recovers idempotently after ledger append fails', () =>
     const run = createRunIdentity({
       paths,
       runId: 'run-recover-evidence',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -986,6 +1084,7 @@ test('concurrent evidence recording cannot append the same run twice', () => {
     const run = createRunIdentity({
       paths,
       runId: 'run-concurrent-evidence',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -1019,6 +1118,7 @@ test('conflicting evidence for an existing run ID fails closed', () => {
     const run = createRunIdentity({
       paths,
       runId: 'run-conflicting-evidence',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -1061,6 +1161,7 @@ test('evidence-directory symlink swaps are rejected before the target can be mut
     const run = createRunIdentity({
       paths,
       runId: 'run-symlink-evidence',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,
@@ -1091,6 +1192,7 @@ test('claim, resolve, and evidence recording never dirty the target repository',
     const run = createRunIdentity({
       paths,
       runId: 'run-clean-target',
+      repositoryKey: REPOSITORY_KEY,
       baseCommit: BASE_COMMIT,
       configDigest: CONFIG_DIGEST,
       workItemDigest: claim.workItemDigest,

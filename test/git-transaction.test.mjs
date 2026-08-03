@@ -107,6 +107,7 @@ function fixture(directory, options = {}) {
   const run = createRunIdentity({
     paths: state.paths,
     runId,
+    repositoryKey: state.repositoryKey,
     baseCommit,
     configDigest: createHash('sha256').update('config').digest('hex'),
     workItemDigest: claim.workItemDigest,

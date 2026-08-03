@@ -9,7 +9,10 @@ import {
   parseCliArguments,
 } from '../src/cli/arguments.mjs'
 import { doctorExitCode, formatDoctorReport, runDoctor } from '../src/cli/doctor.mjs'
+import { runAgentLoopRecover } from '../src/cli/recover.mjs'
 import { runAgentLoopRun } from '../src/cli/run.mjs'
+
+const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 
 function writeError(message) {
   process.stderr.write(`error: ${message}\nTry 'agent-loop --help' for usage.\n`)
@@ -47,6 +50,24 @@ try {
       throw new CliUsageError('option --state-root must be an absolute path')
     }
     const report = await runAgentLoopRun(parsed.options)
+    process.stdout.write(parsed.options.json
+      ? `${JSON.stringify(report.json)}\n`
+      : report.human)
+    process.exitCode = report.exitCode
+  } else if (parsed.command === 'recover') {
+    if (parsed.options.repo === undefined) {
+      throw new CliUsageError('option --repo is required for recover')
+    }
+    if (parsed.options.runId === undefined) {
+      throw new CliUsageError('option --run-id is required for recover')
+    }
+    if (!RUN_ID.test(parsed.options.runId)) {
+      throw new CliUsageError('option --run-id must be a safe identifier')
+    }
+    if (parsed.options.stateRoot !== undefined && !isAbsolute(parsed.options.stateRoot)) {
+      throw new CliUsageError('option --state-root must be an absolute path')
+    }
+    const report = runAgentLoopRecover(parsed.options)
     process.stdout.write(parsed.options.json
       ? `${JSON.stringify(report.json)}\n`
       : report.human)

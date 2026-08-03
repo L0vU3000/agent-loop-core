@@ -93,6 +93,30 @@ After a pass, independently check the base failure, one-child commit ancestry, a
 paths, exact verifier HEAD/test/cleanliness, original checkout HEAD/cleanliness, state-root
 separation, and evidence digest before trusting the result.
 
+## Recover a recorded interruption
+
+If the process stops after canonical evidence and its dispatch-ledger row are persisted but before
+the in-progress work item reaches `done` or `failed`, recover that final deterministic transition:
+
+```bash
+$AGENT_LOOP recover --repo /absolute/path/to/target \
+  --state-root /absolute/path/to/agent-loop-state \
+  --run-id <immutable-run-id> \
+  --json
+```
+
+The run ID is the directory name under `runs/`. Recovery does not require the unsandboxed maker
+acknowledgment because it never invokes Hermes, runs target code, creates commits, or accesses maker
+credentials. It re-reads the immutable run identity and canonical evidence without following
+symlinks, requires the dispatch ledger's complete normalized row and evidence digest to match, then
+resolves only the work-item digest bound into that run.
+
+An exact retry returns the same terminal result. Recovery also reconciles interruption after the
+terminal hard link was created but before the `in-progress` link was removed. Missing evidence,
+partial ledger persistence, conflicting decisions, mismatched digests, and interruptions from any
+earlier transaction phase remain fail-closed for human inspection; this command does not rerun or
+repair those phases.
+
 ## Upgrade
 
 Build and test a new tarball from the intended core revision, then install it into the same tools

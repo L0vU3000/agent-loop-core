@@ -46,6 +46,14 @@ $AGENT_LOOP run \
   --work-item /absolute/path/to/bug-fix.md \
   --acknowledge-unsandboxed-credential-access \
   --json
+
+# If a process was interrupted after canonical evidence was persisted but before
+# its in-progress claim reached done/failed, finish that deterministic transition:
+$AGENT_LOOP recover \
+  --repo /absolute/path/to/target \
+  --state-root /absolute/path/to/agent-loop-state \
+  --run-id <immutable-run-id> \
+  --json
 ```
 
 The target owns `.agent-loop/config.json`; claims, evidence, worktrees, and logs belong under the
@@ -53,6 +61,10 @@ separate state root. The first productized slice runs only a bounded `bug-fix` w
 remote Git operation, and never pushes or merges. The Hermes maker is not OS-sandboxed: use only a
 disposable or trusted non-production target, keep credentials out of target configuration, and
 acknowledge the inherited credential access explicitly.
+
+`recover` never invokes Hermes or reruns target tests. It succeeds only when immutable run state,
+canonical evidence, the complete matching ledger row, and the claimed work-item digest agree. It
+reconciles exact retries and hard-link crash residue; missing or conflicting state fails closed.
 
 See the installation and operating guides in `vault/operations/` for configuration, ownership,
 upgrade, and uninstall details.

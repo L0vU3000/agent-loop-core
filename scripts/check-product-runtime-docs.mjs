@@ -15,6 +15,7 @@ const RULES = [
       [/npm pack --json/u, 'show local package creation'],
       [/(?:agent-loop|\$AGENT_LOOP) doctor/iu, 'show the doctor command'],
       [/(?:agent-loop|\$AGENT_LOOP) run/iu, 'show the run command'],
+      [/(?:agent-loop|\$AGENT_LOOP) recover/iu, 'show the recovery command'],
     ],
   },
   {
@@ -43,6 +44,8 @@ const RULES = [
       [/External mutable state/u, 'document external mutable state'],
       [/(?:agent-loop|\$AGENT_LOOP) doctor[\s\S]{0,240}--json/iu, 'show the doctor command'],
       [/(?:agent-loop|\$AGENT_LOOP) run/iu, 'show the run command'],
+      [/(?:agent-loop|\$AGENT_LOOP) recover[\s\S]{0,240}--run-id/iu, 'show evidence-persisted recovery by run ID'],
+      [/never invokes Hermes/iu, 'state that deterministic recovery does not invoke a maker'],
       [/--acknowledge-unsandboxed-credential-access/u, 'require explicit unsandboxed access acknowledgment'],
       [/not an OS sandbox/iu, 'state the sandbox limitation'],
       [/no push, fetch, pull, clone, or merge/iu, 'state the remote and integration Git boundary'],

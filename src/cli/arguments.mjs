@@ -8,6 +8,7 @@ Usage:
 Commands:
   doctor  Check whether a target repository is safe and ready
   run     Run one bounded bug-fix transaction
+  recover Complete an evidence-persisted interrupted run
 
 Global options:
   --help
@@ -30,6 +31,11 @@ const COMMON_VALUE_OPTIONS = new Map([
 const COMMAND_VALUE_OPTIONS = {
   doctor: COMMON_VALUE_OPTIONS,
   run: new Map([...COMMON_VALUE_OPTIONS, ['--work-item', 'workItem']]),
+  recover: new Map([
+    ['--repo', 'repo'],
+    ['--state-root', 'stateRoot'],
+    ['--run-id', 'runId'],
+  ]),
 }
 
 const COMMAND_FLAG_OPTIONS = {
@@ -38,6 +44,7 @@ const COMMAND_FLAG_OPTIONS = {
     ['--json', 'json'],
     ['--acknowledge-unsandboxed-credential-access', 'acknowledgeUnsandboxedCredentialAccess'],
   ]),
+  recover: new Map([['--json', 'json']]),
 }
 
 export function parseCliArguments(argv) {
@@ -46,7 +53,7 @@ export function parseCliArguments(argv) {
   if (argv.length === 0) throw new CliUsageError('a command is required')
 
   const command = argv[0]
-  if (command !== 'doctor' && command !== 'run') {
+  if (!['doctor', 'run', 'recover'].includes(command)) {
     throw new CliUsageError(`unknown command: ${command}`)
   }
   if (argv.slice(1).includes('--')) {

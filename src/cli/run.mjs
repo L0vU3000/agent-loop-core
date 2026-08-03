@@ -168,6 +168,7 @@ export async function runAgentLoopRun(options, {
     run = createRunIdentityFn({
       paths: state.paths,
       runId,
+      repositoryKey: state.repositoryKey,
       baseCommit,
       configDigest,
       workItemDigest: claim.workItemDigest,

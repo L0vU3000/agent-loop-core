@@ -35,6 +35,7 @@ Usage:
 Commands:
   doctor  Check whether a target repository is safe and ready
   run     Run one bounded bug-fix transaction
+  recover Complete an evidence-persisted interrupted run
 
 Global options:
   --help
@@ -135,6 +136,28 @@ test('run options parse into a typed command request', () => {
         config: '/tmp/config.json',
         stateRoot: '/tmp/state',
         acknowledgeUnsandboxedCredentialAccess: true,
+        json: true,
+      },
+    },
+  )
+})
+
+test('recover options parse into a typed command request without maker acknowledgment', () => {
+  assert.deepEqual(
+    parseCliArguments([
+      'recover',
+      '--repo', '/tmp/repository',
+      '--run-id', 'run-123',
+      '--state-root', '/tmp/state',
+      '--json',
+    ]),
+    {
+      kind: 'command',
+      command: 'recover',
+      options: {
+        repo: '/tmp/repository',
+        runId: 'run-123',
+        stateRoot: '/tmp/state',
         json: true,
       },
     },
