@@ -127,7 +127,8 @@ function isDisjoint(pathA, pathB) {
 }
 
 function writeFakeHermes(executable) {
-  writeFileSync(executable, `#!/usr/bin/env node
+  const nodePath = process.execPath
+  writeFileSync(executable, `#!${nodePath}
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 const args = process.argv.slice(2)
@@ -140,7 +141,7 @@ writeFileSync('src/add.mjs', readFileSync('src/add.mjs', 'utf8').replace('a - b'
 const gitOptions = ['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-c', 'commit.gpgSign=false']
 execFileSync('/usr/bin/git', [...gitOptions, 'add', '-A'], { stdio: 'ignore' })
 execFileSync('/usr/bin/git', [...gitOptions, '-c', 'user.name=Maker', '-c', 'user.email=maker@example.invalid', 'commit', '--quiet', '-m', 'fix: repair addition'], { stdio: 'ignore' })
-writeFileSync(usagePath, JSON.stringify({ model: 'fake-model', provider: 'fake-provider', api_calls: 1, total_tokens: 42, estimated_cost_usd: 0.01, completed: true, failed: false }))
+writeFileSync(usagePath, JSON.stringify({ model: 'claude-sonnet-5', provider: 'anthropic', api_calls: 1, total_tokens: 42, estimated_cost_usd: 0.01, completed: true, failed: false }))
 process.stdout.write('Maker completed and committed the repair.\\n')
 `)
   chmodSync(executable, 0o755)
@@ -166,6 +167,12 @@ test('adds', () => { assert.equal(add(2, 3), 5) })
     pipeline: 'bug-fix',
     test: { executable: process.execPath, args: ['--test', 'test/add.test.mjs'] },
     allowedPaths: ['src/add.mjs'],
+    maker: {
+      provider: 'anthropic',
+      model: 'claude-sonnet-5',
+      timeoutMs: 300000,
+      maxTurns: 40,
+    },
   }))
 
   git(repositoryPath, 'init', '--quiet')

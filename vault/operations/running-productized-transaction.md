@@ -55,6 +55,27 @@ $AGENT_LOOP doctor --repo /absolute/path/to/target \
   --state-root /absolute/path/to/agent-loop-state --json
 ```
 
+Target configuration must declare the bug-fix pipeline, the bounded test command, allowed paths,
+and the required maker route:
+
+```json
+{
+  "schemaVersion": 1,
+  "pipeline": "bug-fix",
+  "test": {
+    "executable": "node",
+    "args": ["--test"]
+  },
+  "allowedPaths": ["src/add.mjs"],
+  "maker": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "timeoutMs": 300000,
+    "maxTurns": 40
+  }
+}
+```
+
 Do not continue unless `healthy` is `true`. Doctor may report `sandbox.deferred` as a warning; that
 warning is not a readiness failure and is not a claim that containment exists.
 
@@ -80,8 +101,16 @@ $AGENT_LOOP run --repo /absolute/path/to/target \
 ```
 
 The normalized JSON result identifies the run, immutable base commit, one non-merge maker commit,
-exact verifier commit, decision, evidence path/digest, and state root. It never contains raw model
-output, raw command errors, credentials, or prompts.
+exact verifier commit, decision, evidence path/digest, and state root. Persisted evidence uses
+schemaVersion 2 and includes a bounded `makerRuntime` provenance object:
+
+- `runtime: "hermes"` and `exitCode: 0`
+- `outputSha256` (lowercase sha256 hex) and `outputBytes` (bounded safe integer)
+- `usage` containing exactly `model`, `provider`, `apiCalls`, `totalTokens`,
+  `estimatedCostUsd`, `completed: true`, and `failed: false`
+
+It never contains raw model output, raw command errors, credentials, prompts, workspace paths, or
+maker stderr/stdout. Unknown fields are rejected at both `makerRuntime` and `usage` levels.
 
 The maintained transaction performs no push, fetch, pull, clone, or merge. It configures no remote,
 does not install target dependencies, and never lands the maker commit in the original checkout.
@@ -108,8 +137,11 @@ $AGENT_LOOP recover --repo /absolute/path/to/target \
 The run ID is the directory name under `runs/`. Recovery does not require the unsandboxed maker
 acknowledgment because it never invokes Hermes, runs target code, creates commits, or accesses maker
 credentials. It re-reads the immutable run identity and canonical evidence without following
-symlinks, requires the dispatch ledger's complete normalized row and evidence digest to match, then
-resolves only the work-item digest bound into that run.
+symlinks. Canonical evidence must be schemaVersion 2 and include the complete normalized
+`makerRuntime` provenance. Recovery requires the dispatch ledger's complete normalized row and
+evidence digest to match, then resolves only the work-item digest bound into that run. schemaVersion
+1 evidence, missing or tampered `makerRuntime`, and conflicting ledger rows remain fail-closed for
+human inspection.
 
 An exact retry returns the same terminal result. Recovery also reconciles interruption after the
 terminal hard link was created but before the `in-progress` link was removed. Missing evidence,

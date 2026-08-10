@@ -22,6 +22,8 @@ import {
 } from '../src/runtime/git-transaction.mjs'
 import { runCommand } from '../src/runtime/command.mjs'
 
+import { canonicalMakerRuntime } from './helpers.mjs'
+
 const WORK_ITEM = '---\npipeline: bug-fix\n---\nFix src/add.mjs without changing tests.\n'
 
 function git(cwd, ...args) {
@@ -117,6 +119,12 @@ function fixture(directory, options = {}) {
     pipeline: 'bug-fix',
     test: Object.freeze({ executable: process.execPath, args: Object.freeze(['--test']) }),
     allowedPaths: Object.freeze(options.allowedPaths ?? ['src/add.mjs']),
+    maker: Object.freeze({
+      provider: 'anthropic',
+      model: 'claude-sonnet-5',
+      timeoutMs: 300000,
+      maxTurns: 40,
+    }),
   })
   return { repositoryRoot, baseCommit, state, claim, run, config }
 }
@@ -132,7 +140,157 @@ async function repairMaker({ workspace }) {
   writeFileSync(join(workspace, 'src', 'add.mjs'), 'export function add(a, b) { return a + b }\n')
   git(workspace, 'add', 'src/add.mjs')
   git(workspace, '-c', 'user.name=Maker', '-c', 'user.email=maker@example.invalid', 'commit', '--quiet', '-m', 'fix: repair addition')
+  return canonicalMakerRuntime()
 }
+
+test('git transaction fails closed when a successful maker executor returns no runtime', async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const { repositoryRoot, state, claim, run, config } = fixture(directory)
+
+    await assert.rejects(
+      () => runGitTransaction({
+        repositoryRoot,
+        paths: state.paths,
+        run,
+        workItem: claim.content,
+        config,
+        makerExecutor: async ({ workspace }) => {
+          await repairMaker({ workspace })
+        },
+      }),
+      (error) => error.code === 'MAKER_RUNTIME_MISSING',
+    )
+  })
+})
+
+test('git transaction fails closed for null, scalar, array, or malformed makerRuntime', async () => {
+  const malformedCases = [
+    { value: null, code: 'MAKER_RUNTIME_MISSING', label: 'null' },
+    { value: 'scalar', code: 'MAKER_RUNTIME_INVALID', label: 'string scalar' },
+    { value: 123, code: 'MAKER_RUNTIME_INVALID', label: 'number scalar' },
+    { value: true, code: 'MAKER_RUNTIME_INVALID', label: 'boolean scalar' },
+    { value: [], code: 'MAKER_RUNTIME_INVALID', label: 'array' },
+    { value: {}, code: 'MAKER_RUNTIME_INVALID', label: 'empty object' },
+    { value: { runtime: 'openai' }, code: 'MAKER_RUNTIME_INVALID', label: 'wrong runtime' },
+    { value: { runtime: 'hermes', exitCode: 1 }, code: 'MAKER_RUNTIME_INVALID', label: 'nonzero exit' },
+    { value: { runtime: 'hermes', exitCode: 0, outputSha256: 'deadbeef' }, code: 'MAKER_RUNTIME_INVALID', label: 'short hash' },
+    { value: { runtime: 'hermes', exitCode: 0, outputSha256: 'a'.repeat(64), outputBytes: -1 }, code: 'MAKER_RUNTIME_INVALID', label: 'negative outputBytes' },
+    { value: { runtime: 'hermes', exitCode: 0, outputSha256: 'a'.repeat(64), outputBytes: 1024 * 1024 + 1 }, code: 'MAKER_RUNTIME_INVALID', label: 'outputBytes above max' },
+    { value: { runtime: 'hermes', exitCode: 0, outputSha256: 'a'.repeat(64), outputBytes: 0, usage: null }, code: 'MAKER_RUNTIME_INVALID', label: 'null usage' },
+    { value: { runtime: 'hermes', exitCode: 0, outputSha256: 'a'.repeat(64), outputBytes: 0, usage: {} }, code: 'MAKER_RUNTIME_INVALID', label: 'empty usage' },
+    { value: { runtime: 'hermes', exitCode: 0, outputSha256: 'a'.repeat(64), outputBytes: 0, usage: { stdout: 'leak' } }, code: 'MAKER_RUNTIME_INVALID', label: 'unknown usage field' },
+    { value: canonicalMakerRuntime({ usage: { apiCalls: 0 } }), code: 'MAKER_RUNTIME_INVALID', label: 'zero api calls' },
+  ]
+
+  for (const { value, code, label } of malformedCases) {
+    await withTemporaryDirectory(async (directory) => {
+      const { repositoryRoot, state, claim, run, config } = fixture(directory, { runId: `run-malformed-${label.replace(/\s+/g, '-')}` })
+
+      await assert.rejects(
+        () => runGitTransaction({
+          repositoryRoot,
+          paths: state.paths,
+          run,
+          workItem: claim.content,
+          config,
+          makerExecutor: async ({ workspace }) => {
+            await repairMaker({ workspace })
+            return value
+          },
+        }),
+        (error) => error.code === code,
+        `expected ${code} for ${label}`,
+      )
+    })
+  }
+})
+
+test('git transaction preserves the exact valid makerRuntime object reference', async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const { repositoryRoot, state, claim, run, config } = fixture(directory)
+    const expectedRuntime = canonicalMakerRuntime({ outputBytes: 1234, usage: { totalTokens: 999 } })
+
+    const result = await runGitTransaction({
+      repositoryRoot,
+      paths: state.paths,
+      run,
+      workItem: claim.content,
+      config,
+      makerExecutor: async ({ workspace }) => {
+        await repairMaker({ workspace })
+        return expectedRuntime
+      },
+    })
+
+    assert.equal(result.makerRuntime, expectedRuntime)
+  })
+})
+
+test('fails closed when the maker-reported provider does not match the configured route', async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const { repositoryRoot, baseCommit, state, claim, run, config } = fixture(directory, {
+      runId: 'run-provider-mismatch',
+    })
+    const branch = `agent-loop/${run.runId}-maker`
+
+    await assert.rejects(
+      () => runGitTransaction({
+        repositoryRoot,
+        paths: state.paths,
+        run,
+        workItem: claim.content,
+        config,
+        makerExecutor: async ({ workspace }) => {
+          await repairMaker({ workspace })
+          return canonicalMakerRuntime({ usage: { provider: 'other-provider' } })
+        },
+      }),
+      (error) => error.code === 'MAKER_ROUTE_MISMATCH',
+    )
+
+    assert.equal(git(repositoryRoot, 'branch', '--list', branch), '')
+    assert.equal(
+      git(repositoryRoot, 'worktree', 'list', '--porcelain').includes(join(state.paths.worktrees, run.runId)),
+      false,
+    )
+    assert.equal(existsSync(join(state.paths.worktrees, run.runId, 'maker')), false)
+    assert.equal(git(repositoryRoot, 'rev-parse', 'HEAD'), baseCommit)
+    assert.equal(git(repositoryRoot, 'status', '--porcelain'), '')
+  })
+})
+
+test('fails closed when the maker-reported model does not match the configured route', async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const { repositoryRoot, baseCommit, state, claim, run, config } = fixture(directory, {
+      runId: 'run-model-mismatch',
+    })
+    const branch = `agent-loop/${run.runId}-maker`
+
+    await assert.rejects(
+      () => runGitTransaction({
+        repositoryRoot,
+        paths: state.paths,
+        run,
+        workItem: claim.content,
+        config,
+        makerExecutor: async ({ workspace }) => {
+          await repairMaker({ workspace })
+          return canonicalMakerRuntime({ usage: { model: 'other-model' } })
+        },
+      }),
+      (error) => error.code === 'MAKER_ROUTE_MISMATCH',
+    )
+
+    assert.equal(git(repositoryRoot, 'branch', '--list', branch), '')
+    assert.equal(
+      git(repositoryRoot, 'worktree', 'list', '--porcelain').includes(join(state.paths.worktrees, run.runId)),
+      false,
+    )
+    assert.equal(existsSync(join(state.paths.worktrees, run.runId, 'maker')), false)
+    assert.equal(git(repositoryRoot, 'rev-parse', 'HEAD'), baseCommit)
+    assert.equal(git(repositoryRoot, 'status', '--porcelain'), '')
+  })
+})
 
 test('runs one failing-base transaction through exact isolated maker and verifier commits', async () => {
   await withTemporaryDirectory(async (directory) => {
@@ -235,6 +393,7 @@ test('rejects unapproved maker paths and cleans every run-owned Git resource', a
           writeFileSync(join(workspace, 'test', 'weakened.test.mjs'), "import test from 'node:test'\ntest('weakened', () => {})\n")
           git(workspace, 'add', 'src/add.mjs', 'test/weakened.test.mjs')
           git(workspace, '-c', 'user.name=Maker', '-c', 'user.email=maker@example.invalid', 'commit', '--quiet', '-m', 'unsafe repair')
+          return canonicalMakerRuntime()
         },
       }),
       (error) => error.code === 'MAKER_CHANGED_UNAPPROVED_PATH',
@@ -269,6 +428,7 @@ test('rejects a rename from an unapproved source into an approved destination', 
           git(workspace, 'mv', 'unapproved.mjs', 'copy.mjs')
           git(workspace, 'add', 'src/add.mjs')
           git(workspace, '-c', 'user.name=Maker', '-c', 'user.email=maker@example.invalid', 'commit', '--quiet', '-m', 'unsafe rename repair')
+          return canonicalMakerRuntime()
         },
       }),
       (error) => error.code === 'MAKER_CHANGED_UNAPPROVED_PATH',
@@ -295,6 +455,7 @@ test('rejects a maker path whose leading space would alias an approved path afte
           writeFileSync(join(workspace, 'src', 'add.mjs'), 'export function add(a, b) { return a + b }\n')
           git(workspace, 'add', ' src/add.mjs', 'src/add.mjs')
           git(workspace, '-c', 'user.name=Maker', '-c', 'user.email=maker@example.invalid', 'commit', '--quiet', '-m', 'unsafe leading-space repair')
+          return canonicalMakerRuntime()
         },
       }),
       (error) => error.code === 'MAKER_CHANGED_UNAPPROVED_PATH',
@@ -457,6 +618,7 @@ test('rejects a maker merge commit even when its first parent is the immutable b
             'commit-tree', tree, '-p', base, '-p', side, '-m', 'merge',
           )
           git(workspace, 'reset', '--hard', merge)
+          return canonicalMakerRuntime()
         },
       }),
       (error) => error.code === 'MAKER_COMMIT_NOT_SINGLE_CHILD',
@@ -480,6 +642,7 @@ test('rejects a maker worktree that is dirty after its one approved commit', asy
         makerExecutor: async ({ workspace }) => {
           await repairMaker({ workspace })
           writeFileSync(join(workspace, 'src', 'add.mjs'), 'export function add(a, b) { return a + b + 0 }\n')
+          return canonicalMakerRuntime()
         },
       }),
       (error) => error.code === 'MAKER_WORKTREE_NOT_CLEAN',
@@ -502,6 +665,7 @@ test('records objective failure when the maker mutates the original checkout', a
       makerExecutor: async ({ workspace }) => {
         await repairMaker({ workspace })
         writeFileSync(join(repositoryRoot, 'unauthorized.txt'), 'mutation\n')
+        return canonicalMakerRuntime()
       },
     })
 
@@ -565,6 +729,7 @@ test('rejects a maker that does not create exactly one child commit', async () =
         config,
         makerExecutor: async ({ workspace }) => {
           writeFileSync(join(workspace, 'src', 'add.mjs'), 'export function add(a, b) { return a + b }\n')
+          return canonicalMakerRuntime()
         },
       }),
       (error) => error.code === 'MAKER_COMMIT_NOT_SINGLE_CHILD',

@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url'
 
 import { runAgentLoopRun } from '../src/cli/run.mjs'
 import { runCommand } from '../src/runtime/command.mjs'
+import { canonicalMakerRuntime } from './helpers.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CLI = resolve(ROOT, 'bin', 'agent-loop.mjs')
@@ -50,7 +51,8 @@ function git(cwd, ...args) {
 }
 
 function writeFakeHermes(executable, { repair = true, mutateOriginalPath } = {}) {
-  writeFileSync(executable, `#!/usr/bin/env node
+  const nodePath = process.execPath
+  writeFileSync(executable, `#!${nodePath}
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 const args = process.argv.slice(2)
@@ -64,14 +66,15 @@ const gitOptions = ['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=fals
 execFileSync('/usr/bin/git', [...gitOptions, 'add', '-A'], { stdio: 'ignore' })
 execFileSync('/usr/bin/git', [...gitOptions, '-c', 'user.name=Maker', '-c', 'user.email=maker@example.invalid', 'commit', '--quiet', '-m', 'fix: repair addition'], { stdio: 'ignore' })
 ${mutateOriginalPath === undefined ? '' : `writeFileSync(${JSON.stringify(mutateOriginalPath)}, 'unauthorized mutation\\n')`}
-writeFileSync(usagePath, JSON.stringify({ model: 'fake-model', provider: 'fake-provider', api_calls: 1, total_tokens: 42, estimated_cost_usd: 0.01, completed: true, failed: false }))
+writeFileSync(usagePath, JSON.stringify({ model: 'claude-sonnet-5', provider: 'anthropic', api_calls: 1, total_tokens: 42, estimated_cost_usd: 0.01, completed: true, failed: false }))
 process.stdout.write('Maker completed and committed the repair.\\n')
 `)
   chmodSync(executable, 0o755)
 }
 
 function writeNoCommitHermes(executable) {
-  writeFileSync(executable, `#!/usr/bin/env node
+  const nodePath = process.execPath
+  writeFileSync(executable, `#!${nodePath}
 import { writeFileSync } from 'node:fs'
 const args = process.argv.slice(2)
 if (args.length === 1 && args[0] === '--version') {
@@ -79,7 +82,7 @@ if (args.length === 1 && args[0] === '--version') {
   process.exit(0)
 }
 const usagePath = args[args.indexOf('--usage-file') + 1]
-writeFileSync(usagePath, JSON.stringify({ model: 'fake-model', provider: 'fake-provider', api_calls: 1, total_tokens: 42, estimated_cost_usd: 0.01, completed: true, failed: false }))
+writeFileSync(usagePath, JSON.stringify({ model: 'claude-sonnet-5', provider: 'anthropic', api_calls: 1, total_tokens: 42, estimated_cost_usd: 0.01, completed: true, failed: false }))
 process.stdout.write('Maker made no commit.\\n')
 `)
   chmodSync(executable, 0o755)
@@ -105,6 +108,12 @@ test('adds', () => { assert.equal(add(2, 3), 5) })
     pipeline: 'bug-fix',
     test: { executable: process.execPath, args: ['--test'] },
     allowedPaths: ['src/add.mjs'],
+    maker: {
+      provider: 'anthropic',
+      model: 'claude-sonnet-5',
+      timeoutMs: 300000,
+      maxTurns: 40,
+    },
   }))
 
   git(repositoryPath, 'init', '--quiet')
@@ -250,22 +259,72 @@ function fakeStagePipeline(overrides = {}) {
     parentCommit: run.baseCommit,
     changedPaths: Object.freeze(['src/add.mjs']),
   })
+  const makerRuntime = canonicalMakerRuntime()
   const resolveCalls = []
   const defaults = {
     runDoctorFn: () => ({ schemaVersion: 1, healthy: true, checks: [] }),
     deriveRepositoryStateFn: () => state,
-    loadConfigFn: () => Object.freeze({ schemaVersion: 1, pipeline: 'bug-fix' }),
+    loadConfigFn: () => fakeConfig(),
     resolveBaseCommitFn: () => run.baseCommit,
     assertMakerBranchAvailableFn: () => `agent-loop/${run.runId}-maker`,
     claimWorkItemFn: () => claim,
     createRunIdentityFn: () => run,
     findExecutableFn: () => '/trusted/bin/hermes',
-    createHermesMakerFn: () => async () => {},
+    createHermesMakerFn: () => async () => canonicalMakerRuntime(),
+    runGitTransactionFn: async () => {
+      throw new Error('stop after maker construction')
+    },
+    recordEvidenceFn: () => {},
     resolveWorkItemFn: (call) => { resolveCalls.push(call) },
     ...overrides,
   }
-  return { state, claim, run, maker, resolveCalls, defaults }
+  return { state, claim, run, maker, makerRuntime, resolveCalls, defaults }
 }
+
+const CANONICAL_MAKER_CONFIG = Object.freeze({
+  provider: 'anthropic',
+  model: 'claude-sonnet-5',
+  timeoutMs: 300_000,
+  maxTurns: 40,
+})
+
+function fakeConfig(overrides = {}) {
+  return Object.freeze({
+    schemaVersion: 1,
+    pipeline: 'bug-fix',
+    test: Object.freeze({ executable: process.execPath, args: Object.freeze(['--test']) }),
+    allowedPaths: Object.freeze(['src/add.mjs']),
+    maker: { ...CANONICAL_MAKER_CONFIG },
+    ...overrides,
+  })
+}
+
+test('passes config.maker provider, model, timeoutMs, and maxTurns into createHermesMakerFn', async () => {
+  let makerOptions
+  const config = fakeConfig()
+  const { defaults } = fakeStagePipeline({
+    loadConfigFn: () => config,
+    createHermesMakerFn: (options) => {
+      makerOptions = options
+      return async () => {}
+    },
+    runGitTransactionFn: async () => {
+      throw new Error('stop after maker construction')
+    },
+  })
+
+  await runAgentLoopRun(
+    { repo: '/x', workItem: '/x.md', acknowledgeUnsandboxedCredentialAccess: true },
+    defaults,
+  )
+
+  assert.equal(makerOptions.executable, '/trusted/bin/hermes')
+  assert.equal(makerOptions.provider, config.maker.provider)
+  assert.equal(makerOptions.model, config.maker.model)
+  assert.equal(makerOptions.timeoutMs, config.maker.timeoutMs)
+  assert.equal(makerOptions.maxTurns, config.maker.maxTurns)
+  assert.equal(makerOptions.acknowledgeUnsandboxedCredentialAccess, true)
+})
 
 test('pins the maker to a trusted Hermes executable outside the target and Git metadata roots', async () => {
   let lookup
@@ -299,9 +358,10 @@ test('pins the maker to a trusted Hermes executable outside the target and Git m
 })
 
 test('records a pass decision with normalized JSON and exit code zero', async () => {
-  const { run, maker, resolveCalls, defaults } = fakeStagePipeline({
+  const { run, maker, makerRuntime, resolveCalls, defaults } = fakeStagePipeline({
     runGitTransactionFn: async () => ({
       maker,
+      makerRuntime,
       verifier: { runId: run.runId, artifactId: maker.artifactId, commit: maker.commit, verdict: 'pass', score: 1, exitCode: 0 },
       objectiveGate: {
         runId: run.runId,
@@ -339,9 +399,10 @@ test('records a pass decision with normalized JSON and exit code zero', async ()
 })
 
 test('records a fail decision with exit code one when the objective gate does not pass', async () => {
-  const { run, maker, resolveCalls, defaults } = fakeStagePipeline({
+  const { run, maker, makerRuntime, resolveCalls, defaults } = fakeStagePipeline({
     runGitTransactionFn: async () => ({
       maker,
+      makerRuntime,
       verifier: { runId: run.runId, artifactId: maker.artifactId, commit: maker.commit, verdict: 'fail', score: 0, exitCode: 1 },
       objectiveGate: {
         runId: run.runId,
@@ -450,8 +511,20 @@ test('a real disposable fake-Hermes transaction repairs an external repository, 
       assert.equal(report.json.stateRoot, stateRoot)
       assert.equal(existsSync(report.json.evidencePath), true)
       const evidenceOnDisk = readFileSync(report.json.evidencePath, 'utf8')
+      const parsedEvidence = JSON.parse(evidenceOnDisk)
       assert.equal(createHash('sha256').update(evidenceOnDisk).digest('hex'), report.json.evidenceDigest)
       assert.doesNotMatch(evidenceOnDisk, /Maker completed and committed the repair/)
+      assert.equal(parsedEvidence.schemaVersion, 2)
+      assert.equal(parsedEvidence.makerRuntime.runtime, 'hermes')
+      assert.equal(parsedEvidence.makerRuntime.exitCode, 0)
+      assert.equal(parsedEvidence.makerRuntime.usage.provider, 'anthropic')
+      assert.equal(parsedEvidence.makerRuntime.usage.model, 'claude-sonnet-5')
+      assert.equal(parsedEvidence.makerRuntime.usage.completed, true)
+      assert.equal(parsedEvidence.makerRuntime.usage.failed, false)
+      assert.equal(parsedEvidence.decision, 'pass')
+      assert.equal(parsedEvidence.makerRuntime.stdout, undefined)
+      assert.equal(parsedEvidence.makerRuntime.stderr, undefined)
+      assert.equal(parsedEvidence.makerRuntime.usage.rawOutput, undefined)
 
       assert.equal(readFileSync(configPath, 'utf8'), configBefore)
       assert.equal(git(repositoryPath, 'rev-parse', 'HEAD'), headBefore)

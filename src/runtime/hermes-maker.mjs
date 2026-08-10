@@ -13,9 +13,11 @@ import { join } from 'node:path'
 import { TextDecoder } from 'node:util'
 
 import { runCommand } from './command.mjs'
+import { assertMakerRoute } from '../config/load-config.mjs'
+import { assertMakerRuntime, MAKER_RUNTIME_BOUNDS } from '../core/evidence.mjs'
 
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
-const MAX_OUTPUT_BYTES = 1024 * 1024
+const MAX_OUTPUT_BYTES = MAKER_RUNTIME_BOUNDS.maxOutputBytes
 const MAX_USAGE_BYTES = 64 * 1024
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 
@@ -78,7 +80,7 @@ function readUsageEvidence(path) {
     !raw || typeof raw !== 'object' || Array.isArray(raw)
     || typeof raw.model !== 'string' || raw.model.length === 0
     || typeof raw.provider !== 'string' || raw.provider.length === 0
-    || !Number.isSafeInteger(raw.api_calls) || raw.api_calls < 1
+    || !Number.isSafeInteger(raw.api_calls) || raw.api_calls < MAKER_RUNTIME_BOUNDS.minApiCalls
     || !Number.isSafeInteger(raw.total_tokens) || raw.total_tokens < 0
     || typeof raw.estimated_cost_usd !== 'number' || raw.estimated_cost_usd < 0
     || raw.completed !== true || raw.failed !== false
@@ -132,6 +134,7 @@ export function createHermesMaker({
   executable = 'hermes',
   model,
   provider,
+  maxTurns,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   acknowledgeUnsandboxedCredentialAccess = false,
   commandRunner = runCommand,
@@ -139,6 +142,14 @@ export function createHermesMaker({
   if (acknowledgeUnsandboxedCredentialAccess !== true) {
     throw new HermesMakerError('HERMES_ACKNOWLEDGMENT_REQUIRED')
   }
+
+  const route = { provider, model, timeoutMs, maxTurns }
+  try {
+    assertMakerRoute(route)
+  } catch (error) {
+    throw new HermesMakerError('HERMES_ROUTE_INVALID', String(error?.message ?? error))
+  }
+  Object.freeze(route)
 
   return async function executeHermesMaker({ workspace, run, workItem, config }) {
     if (!RUN_ID.test(run?.runId ?? '')) throw new HermesMakerError('RUN_ID_INVALID')
@@ -150,13 +161,14 @@ export function createHermesMaker({
         '--toolsets', 'terminal,file',
         '--ignore-rules',
         '--usage-file', usagePath,
+        '--model', route.model,
+        '--provider', route.provider,
+        '--max-turns', String(route.maxTurns),
       ]
-      if (model) args.push('--model', model)
-      if (provider) args.push('--provider', provider)
 
       const result = commandRunner(executable, args, {
         cwd: workspace,
-        timeout: timeoutMs,
+        timeout: route.timeoutMs,
         maxBuffer: MAX_OUTPUT_BYTES,
         killSignal: 'SIGKILL',
       })
@@ -172,16 +184,44 @@ export function createHermesMaker({
       }
 
       const usage = readUsageEvidence(usagePath)
+      if (usage.model !== route.model || usage.provider !== route.provider) {
+        throw new HermesMakerError('HERMES_ROUTE_MISMATCH', `${usage.provider}/${usage.model}`)
+      }
       const output = result.stdout ?? ''
+      if (Buffer.byteLength(output) > MAKER_RUNTIME_BOUNDS.maxOutputBytes) {
+        throw new HermesMakerError('HERMES_OUTPUT_OVERSIZED', String(Buffer.byteLength(output)))
+      }
+      if (usage.apiCalls > MAKER_RUNTIME_BOUNDS.maxApiCalls) {
+        throw new HermesMakerError('HERMES_USAGE_OVERSIZED', String(usage.apiCalls))
+      }
+      if (usage.totalTokens > MAKER_RUNTIME_BOUNDS.maxTotalTokens) {
+        throw new HermesMakerError('HERMES_USAGE_OVERSIZED', String(usage.totalTokens))
+      }
+      if (usage.estimatedCostUsd > MAKER_RUNTIME_BOUNDS.maxEstimatedCostUsd) {
+        throw new HermesMakerError('HERMES_USAGE_OVERSIZED', String(usage.estimatedCostUsd))
+      }
 
-      return Object.freeze({
-        schemaVersion: 1,
+      const makerRuntime = Object.freeze({
         runtime: 'hermes',
         exitCode: result.status,
         outputSha256: sha256(output),
         outputBytes: Buffer.byteLength(output),
-        usage,
+        usage: Object.freeze({
+          model: usage.model,
+          provider: usage.provider,
+          apiCalls: usage.apiCalls,
+          totalTokens: usage.totalTokens,
+          estimatedCostUsd: usage.estimatedCostUsd,
+          completed: usage.completed,
+          failed: usage.failed,
+        }),
       })
+      try {
+        assertMakerRuntime(makerRuntime)
+      } catch (error) {
+        throw new HermesMakerError('HERMES_RUNTIME_INVALID', String(error?.message ?? error))
+      }
+      return makerRuntime
     } finally {
       rmSync(runtimeRoot, { recursive: true, force: true })
     }

@@ -36,6 +36,7 @@ const EVIDENCE_KEYS = [
   'maker',
   'verifier',
   'objectiveGate',
+  'makerRuntime',
   'decision',
 ]
 const MAX_EVIDENCE_BYTES = 256 * 1024
@@ -47,6 +48,18 @@ const OBJECTIVE_CHECK_IDS = Object.freeze([
   'originalClean',
   'tests',
 ])
+// Canonical runtime bounds shared by the Hermes maker producer and the evidence schema.
+// They are exported so the producer can mechanically enforce the same ceiling before the
+// result reaches the evidence boundary, preventing drift.
+export const MAKER_RUNTIME_BOUNDS = Object.freeze({
+  maxOutputBytes: 1024 * 1024,
+  minApiCalls: 1,
+  maxApiCalls: 1_000_000,
+  maxTotalTokens: 1_000_000_000,
+  maxEstimatedCostUsd: 1_000_000,
+})
+
+const SAFE_MAKER_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u
 
 function readUtf8RegularFileNoFollow(filePath, maximumBytes, label) {
   let descriptor
@@ -191,6 +204,81 @@ function normalizeMaker(maker) {
   return Object.freeze(normalized)
 }
 
+const MAKER_RUNTIME_KEYS = ['runtime', 'exitCode', 'outputSha256', 'outputBytes', 'usage']
+const USAGE_KEYS = ['model', 'provider', 'apiCalls', 'totalTokens', 'estimatedCostUsd', 'completed', 'failed']
+
+export function assertMakerRuntime(makerRuntime) {
+  requireOnlyKeys(makerRuntime, MAKER_RUNTIME_KEYS, 'makerRuntime')
+  if (makerRuntime.runtime !== 'hermes') throw new Error('makerRuntime.runtime must be "hermes"')
+  if (makerRuntime.exitCode !== 0) throw new Error('makerRuntime.exitCode must be 0')
+  if (typeof makerRuntime.outputSha256 !== 'string' || !HEX64.test(makerRuntime.outputSha256)) {
+    throw new Error('makerRuntime.outputSha256 must be a lowercase sha256 hex digest')
+  }
+  if (
+    !Number.isSafeInteger(makerRuntime.outputBytes)
+    || makerRuntime.outputBytes < 0
+    || makerRuntime.outputBytes > MAKER_RUNTIME_BOUNDS.maxOutputBytes
+  ) {
+    throw new Error(`makerRuntime.outputBytes must be a safe integer between 0 and ${MAKER_RUNTIME_BOUNDS.maxOutputBytes}`)
+  }
+  const usage = makerRuntime.usage
+  if (usage === null || typeof usage !== 'object' || Array.isArray(usage)) {
+    throw new Error('makerRuntime.usage must be an object')
+  }
+  requireOnlyKeys(usage, USAGE_KEYS, 'makerRuntime.usage')
+  if (typeof usage.model !== 'string' || !SAFE_MAKER_IDENTIFIER.test(usage.model)) {
+    throw new Error('makerRuntime.usage.model must be a safe non-empty identifier')
+  }
+  if (typeof usage.provider !== 'string' || !SAFE_MAKER_IDENTIFIER.test(usage.provider)) {
+    throw new Error('makerRuntime.usage.provider must be a safe non-empty identifier')
+  }
+  if (
+    !Number.isSafeInteger(usage.apiCalls)
+    || usage.apiCalls < MAKER_RUNTIME_BOUNDS.minApiCalls
+    || usage.apiCalls > MAKER_RUNTIME_BOUNDS.maxApiCalls
+  ) {
+    throw new Error(`makerRuntime.usage.apiCalls must be a safe integer between ${MAKER_RUNTIME_BOUNDS.minApiCalls} and ${MAKER_RUNTIME_BOUNDS.maxApiCalls}`)
+  }
+  if (
+    !Number.isSafeInteger(usage.totalTokens)
+    || usage.totalTokens < 0
+    || usage.totalTokens > MAKER_RUNTIME_BOUNDS.maxTotalTokens
+  ) {
+    throw new Error(`makerRuntime.usage.totalTokens must be a safe integer between 0 and ${MAKER_RUNTIME_BOUNDS.maxTotalTokens}`)
+  }
+  if (
+    typeof usage.estimatedCostUsd !== 'number'
+    || !Number.isFinite(usage.estimatedCostUsd)
+    || usage.estimatedCostUsd < 0
+    || usage.estimatedCostUsd > MAKER_RUNTIME_BOUNDS.maxEstimatedCostUsd
+  ) {
+    throw new Error(`makerRuntime.usage.estimatedCostUsd must be a finite number between 0 and ${MAKER_RUNTIME_BOUNDS.maxEstimatedCostUsd}`)
+  }
+  if (usage.completed !== true) throw new Error('makerRuntime.usage.completed must be true')
+  if (usage.failed !== false) throw new Error('makerRuntime.usage.failed must be false')
+  return true
+}
+
+function normalizeMakerRuntime(makerRuntime) {
+  assertMakerRuntime(makerRuntime)
+  const usage = makerRuntime.usage
+  return Object.freeze({
+    runtime: makerRuntime.runtime,
+    exitCode: makerRuntime.exitCode,
+    outputSha256: makerRuntime.outputSha256,
+    outputBytes: makerRuntime.outputBytes,
+    usage: Object.freeze({
+      model: usage.model,
+      provider: usage.provider,
+      apiCalls: usage.apiCalls,
+      totalTokens: usage.totalTokens,
+      estimatedCostUsd: usage.estimatedCostUsd,
+      completed: usage.completed,
+      failed: usage.failed,
+    }),
+  })
+}
+
 const VERIFIER_KEYS = ['runId', 'artifactId', 'commit', 'verdict', 'score', 'exitCode']
 
 function normalizeVerifier(verifier) {
@@ -302,9 +390,9 @@ export function assertEvidenceBinding(run, maker, verifier, objectiveGate) {
 
 function normalizeEvidenceRecord(record) {
   requireOnlyKeys(record, EVIDENCE_KEYS, 'evidence')
-  if (record.schemaVersion !== 1) throw new Error('evidence.schemaVersion must be 1')
+  if (record.schemaVersion !== 2) throw new Error('evidence.schemaVersion must be 2')
   const run = normalizeRunIdentity({
-    schemaVersion: record.schemaVersion,
+    schemaVersion: 1,
     runId: record.runId,
     repositoryKey: record.repositoryKey,
     baseCommit: record.baseCommit,
@@ -314,6 +402,7 @@ function normalizeEvidenceRecord(record) {
   const maker = normalizeMaker(record.maker)
   const verifier = normalizeVerifier(record.verifier)
   const objectiveGate = normalizeObjectiveGate(record.objectiveGate)
+  const makerRuntime = normalizeMakerRuntime(record.makerRuntime)
   if (record.decision !== 'pass' && record.decision !== 'fail') {
     throw new Error('evidence.decision must be "pass" or "fail"')
   }
@@ -325,10 +414,16 @@ function normalizeEvidenceRecord(record) {
     throw new Error('DECISION_PASS_REQUIRES_PASSING_VERIFIER_AND_OBJECTIVE_GATE')
   }
   return Object.freeze({
-    ...run,
+    schemaVersion: 2,
+    runId: run.runId,
+    repositoryKey: run.repositoryKey,
+    baseCommit: run.baseCommit,
+    configDigest: run.configDigest,
+    workItemDigest: run.workItemDigest,
     maker,
     verifier,
     objectiveGate,
+    makerRuntime,
     decision: record.decision,
   })
 }
@@ -414,7 +509,7 @@ export function loadRecordedEvidence({ paths, runId }) {
 // persisted once per run. Exact retries reconcile a missing ledger append idempotently; conflicting
 // evidence for the same run remains fail-closed.
 export function recordEvidence(
-  { paths, run, maker, verifier, objectiveGate, decision },
+  { paths, run, maker, verifier, objectiveGate, makerRuntime, decision },
   { appendLedger = appendFileSync } = {},
 ) {
   if (decision !== 'pass' && decision !== 'fail') {
@@ -424,6 +519,7 @@ export function recordEvidence(
   const normalizedMaker = normalizeMaker(maker)
   const normalizedVerifier = normalizeVerifier(verifier)
   const normalizedObjectiveGate = normalizeObjectiveGate(objectiveGate)
+  const normalizedMakerRuntime = normalizeMakerRuntime(makerRuntime)
   assertEvidenceBinding(normalizedRun, normalizedMaker, normalizedVerifier, normalizedObjectiveGate)
 
   if (
@@ -438,7 +534,7 @@ export function recordEvidence(
   }
 
   const record = Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: normalizedRun.runId,
     repositoryKey: normalizedRun.repositoryKey,
     baseCommit: normalizedRun.baseCommit,
@@ -447,6 +543,7 @@ export function recordEvidence(
     maker: normalizedMaker,
     verifier: normalizedVerifier,
     objectiveGate: normalizedObjectiveGate,
+    makerRuntime: normalizedMakerRuntime,
     decision,
   })
 

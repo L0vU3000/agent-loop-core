@@ -27,6 +27,12 @@ function validConfig(overrides = {}) {
       args: ['--test'],
     },
     allowedPaths: ['src/add.mjs'],
+    maker: {
+      provider: 'anthropic',
+      model: 'claude-sonnet-5',
+      timeoutMs: 300000,
+      maxTurns: 40,
+    },
     ...overrides,
   }
 }
@@ -43,6 +49,7 @@ test('loads, normalizes, and deeply freezes a valid target configuration', () =>
     assert.equal(Object.isFrozen(config.test), true)
     assert.equal(Object.isFrozen(config.test.args), true)
     assert.equal(Object.isFrozen(config.allowedPaths), true)
+    assert.equal(Object.isFrozen(config.maker), true)
   })
 })
 
@@ -136,6 +143,84 @@ test('rejects unsafe, ambiguous, empty, and duplicate allowed paths', () => {
     for (const [index, allowedPaths] of invalidAllowedPaths.entries()) {
       const configPath = join(directory, `config-${index}.json`)
       writeFileSync(configPath, JSON.stringify(validConfig({ allowedPaths })))
+      assert.throws(() => loadConfig(configPath), Error, `case ${index} should fail`)
+    }
+  })
+})
+
+test('rejects a missing maker route/timeout/turn-limit configuration', () => {
+  withTemporaryDirectory((directory) => {
+    const configPath = join(directory, 'config.json')
+    writeFileSync(configPath, JSON.stringify(validConfig({ maker: undefined })))
+
+    assert.throws(() => loadConfig(configPath), /maker must be a JSON object/)
+  })
+})
+
+test('rejects unknown maker keys', () => {
+  withTemporaryDirectory((directory) => {
+    const configPath = join(directory, 'config.json')
+    writeFileSync(configPath, JSON.stringify(validConfig({
+      maker: {
+        provider: 'anthropic',
+        model: 'claude-sonnet-5',
+        timeoutMs: 300000,
+        maxTurns: 40,
+        apiKey: 'must-not-be-accepted',
+      },
+    })))
+
+    assert.throws(() => loadConfig(configPath), /unknown maker key: apiKey/)
+  })
+})
+
+test('rejects unsafe, empty, or non-identifier maker provider and model values', () => {
+  const invalidRoutes = [
+    { provider: '', model: 'claude-sonnet-5' },
+    { provider: 'anthropic', model: '' },
+    { provider: 'anthropic;rm', model: 'claude-sonnet-5' },
+    { provider: 'anthropic', model: 'claude sonnet 5' },
+    { provider: '-anthropic', model: 'claude-sonnet-5' },
+    { provider: 'anthropic', model: '--model-injection' },
+    { provider: 'anthropic\0', model: 'claude-sonnet-5' },
+    { provider: 1, model: 'claude-sonnet-5' },
+    { provider: 'anthropic', model: null },
+  ]
+
+  withTemporaryDirectory((directory) => {
+    for (const [index, route] of invalidRoutes.entries()) {
+      const configPath = join(directory, `config-${index}.json`)
+      writeFileSync(configPath, JSON.stringify(validConfig({
+        maker: { provider: 'anthropic', model: 'claude-sonnet-5', timeoutMs: 300000, maxTurns: 40, ...route },
+      })))
+      assert.throws(() => loadConfig(configPath), Error, `case ${index} should fail`)
+    }
+  })
+})
+
+test('rejects maker timeoutMs and maxTurns outside sensible finite integer bounds', () => {
+  const invalidBounds = [
+    { timeoutMs: 0 },
+    { timeoutMs: -1 },
+    { timeoutMs: 1.5 },
+    { timeoutMs: 999 },
+    { timeoutMs: 3_600_001 },
+    { timeoutMs: Infinity },
+    { timeoutMs: '300000' },
+    { maxTurns: 0 },
+    { maxTurns: -1 },
+    { maxTurns: 1.5 },
+    { maxTurns: 201 },
+    { maxTurns: Infinity },
+    { maxTurns: '40' },
+  ]
+
+  withTemporaryDirectory((directory) => {
+    for (const [index, override] of invalidBounds.entries()) {
+      const configPath = join(directory, `config-${index}.json`)
+      writeFileSync(configPath, JSON.stringify(validConfig({
+        maker: { provider: 'anthropic', model: 'claude-sonnet-5', timeoutMs: 300000, maxTurns: 40, ...override },
+      })))
       assert.throws(() => loadConfig(configPath), Error, `case ${index} should fail`)
     }
   })

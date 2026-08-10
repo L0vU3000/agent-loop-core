@@ -9,8 +9,14 @@ import { posix } from 'node:path'
 
 const MAX_CONFIG_BYTES = 64 * 1024
 
-const TOP_LEVEL_KEYS = new Set(['schemaVersion', 'pipeline', 'test', 'allowedPaths'])
+const TOP_LEVEL_KEYS = new Set(['schemaVersion', 'pipeline', 'test', 'allowedPaths', 'maker'])
 const TEST_KEYS = new Set(['executable', 'args'])
+const MAKER_KEYS = new Set(['provider', 'model', 'timeoutMs', 'maxTurns'])
+const SAFE_MAKER_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u
+const MIN_MAKER_TIMEOUT_MS = 1_000
+const MAX_MAKER_TIMEOUT_MS = 3_600_000
+const MIN_MAKER_MAX_TURNS = 1
+const MAX_MAKER_MAX_TURNS = 200
 
 function validateTestCommand(testCommand) {
   if (!testCommand || typeof testCommand !== 'object' || Array.isArray(testCommand)) {
@@ -31,6 +37,35 @@ function validateTestCommand(testCommand) {
     if (typeof argument !== 'string' || argument.includes('\0')) {
       throw new Error('test.args entries must be strings without NUL')
     }
+  }
+}
+
+export function assertMakerRoute(maker) {
+  if (!maker || typeof maker !== 'object' || Array.isArray(maker)) {
+    throw new Error('maker must be a JSON object')
+  }
+  for (const key of Object.keys(maker)) {
+    if (!MAKER_KEYS.has(key)) throw new Error(`unknown maker key: ${key}`)
+  }
+  if (typeof maker.provider !== 'string' || !SAFE_MAKER_IDENTIFIER.test(maker.provider)) {
+    throw new Error('maker.provider must be a safe non-empty identifier')
+  }
+  if (typeof maker.model !== 'string' || !SAFE_MAKER_IDENTIFIER.test(maker.model)) {
+    throw new Error('maker.model must be a safe non-empty identifier')
+  }
+  if (
+    !Number.isInteger(maker.timeoutMs)
+    || maker.timeoutMs < MIN_MAKER_TIMEOUT_MS
+    || maker.timeoutMs > MAX_MAKER_TIMEOUT_MS
+  ) {
+    throw new Error(`maker.timeoutMs must be an integer between ${MIN_MAKER_TIMEOUT_MS} and ${MAX_MAKER_TIMEOUT_MS}`)
+  }
+  if (
+    !Number.isInteger(maker.maxTurns)
+    || maker.maxTurns < MIN_MAKER_MAX_TURNS
+    || maker.maxTurns > MAX_MAKER_MAX_TURNS
+  ) {
+    throw new Error(`maker.maxTurns must be an integer between ${MIN_MAKER_MAX_TURNS} and ${MAX_MAKER_MAX_TURNS}`)
   }
 }
 
@@ -112,5 +147,6 @@ export function loadConfig(configPath) {
   if (parsed.pipeline !== 'bug-fix') throw new Error('pipeline must be bug-fix')
   validateTestCommand(parsed.test)
   validateAllowedPaths(parsed.allowedPaths)
+  assertMakerRoute(parsed.maker)
   return deepFreeze(parsed)
 }

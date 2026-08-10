@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, realpathSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
+import { assertMakerRuntime } from '../core/evidence.mjs'
 import { prepareStateDirectory } from '../paths/state-mutation.mjs'
 import { runCommand } from './command.mjs'
 
@@ -203,10 +204,26 @@ export async function runGitTransaction({
   )
   makerAdminDirectory = resolveOwnedWorktreeAdmin(repositoryRoot, makerWorkspace, commandRunner)
 
+  let makerRuntime
   try {
-    await makerExecutor({ workspace: makerWorkspace, run, workItem, config })
+    makerRuntime = await makerExecutor({ workspace: makerWorkspace, run, workItem, config })
   } catch (error) {
     throw new GitTransactionError('MAKER_EXECUTOR_FAILED', String(error?.message ?? error))
+  }
+  if (makerRuntime === undefined || makerRuntime === null) {
+    throw new GitTransactionError('MAKER_RUNTIME_MISSING')
+  }
+  try {
+    assertMakerRuntime(makerRuntime)
+  } catch (error) {
+    throw new GitTransactionError('MAKER_RUNTIME_INVALID', String(error?.message ?? error))
+  }
+  if (
+    !config.maker || typeof config.maker !== 'object'
+    || makerRuntime.usage.provider !== config.maker.provider
+    || makerRuntime.usage.model !== config.maker.model
+  ) {
+    throw new GitTransactionError('MAKER_ROUTE_MISMATCH')
   }
   const makerTest = runConfiguredTests(makerWorkspace, config, commandRunner)
   if (makerTest.status !== 0 || makerTest.errorCode !== null) {
@@ -306,6 +323,7 @@ export async function runGitTransaction({
   return freezeDeep({
     preflight,
     maker,
+    makerRuntime,
     verifier,
     objectiveGate,
     workspaces: {

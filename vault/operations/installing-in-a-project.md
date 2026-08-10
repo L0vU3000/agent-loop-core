@@ -43,7 +43,13 @@ Create the target-owned configuration at `/absolute/path/to/target/.agent-loop/c
     "executable": "node",
     "args": ["--test"]
   },
-  "allowedPaths": ["src/add.mjs"]
+  "allowedPaths": ["src/add.mjs"],
+  "maker": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "timeoutMs": 300000,
+    "maxTurns": 40
+  }
 }
 ```
 

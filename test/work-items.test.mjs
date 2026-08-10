@@ -25,6 +25,7 @@ import {
 } from '../src/core/work-items.mjs'
 import { createRunIdentity, recordEvidence } from '../src/core/evidence.mjs'
 import { deriveRepositoryState } from '../src/paths/repository-state.mjs'
+import { canonicalMakerRuntime } from './helpers.mjs'
 
 const WORK_ITEM_CONTENT = '---\npipeline: bug-fix\n---\nFix the defect described here. Stay within configured allowed paths.\n'
 const REPOSITORY_KEY = 'f'.repeat(24)
@@ -85,6 +86,7 @@ function canonicalEvidenceArtifacts({ runId, commit }) {
     maker: canonicalMaker({ runId, commit }),
     verifier: canonicalVerifier({ runId, commit }),
     objectiveGate: canonicalObjectiveGate({ runId, commit }),
+    makerRuntime: canonicalMakerRuntime(),
   }
 }
 
@@ -512,9 +514,9 @@ test('evidence binds run, maker artifact, verifier, and objective gate together'
       workItemDigest: claim.workItemDigest,
     })
     const commit = 'b'.repeat(40)
-    const { maker, verifier, objectiveGate } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
+    const { maker, verifier, objectiveGate, makerRuntime } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
 
-    const outcome = recordEvidence({ paths, run, maker, verifier, objectiveGate, decision: 'pass' })
+    const outcome = recordEvidence({ paths, run, maker, verifier, objectiveGate, makerRuntime, decision: 'pass' })
 
     assert.equal(outcome.record.runId, run.runId)
     assert.equal(outcome.record.decision, 'pass')
@@ -547,7 +549,7 @@ test('rejects evidence whose maker/verifier/objective-gate run ID does not match
     const objectiveGate = canonicalObjectiveGate({ runId: run.runId, commit })
 
     assert.throws(
-      () => recordEvidence({ paths, run, maker, verifier, objectiveGate, decision: 'pass' }),
+      () => recordEvidence({ paths, run, maker, verifier, objectiveGate, makerRuntime: canonicalMakerRuntime(), decision: 'pass' }),
       /RUN_ID_MISMATCH/,
     )
   })
@@ -570,7 +572,7 @@ test('rejects evidence whose verifier or objective-gate commit disagrees with th
     const objectiveGate = canonicalObjectiveGate({ runId: run.runId, commit: 'd'.repeat(40) })
 
     assert.throws(
-      () => recordEvidence({ paths, run, maker, verifier, objectiveGate, decision: 'pass' }),
+      () => recordEvidence({ paths, run, maker, verifier, objectiveGate, makerRuntime: canonicalMakerRuntime(), decision: 'pass' }),
       /EVIDENCE_COMMIT_MISMATCH/,
     )
   })
@@ -589,7 +591,7 @@ test('rejects evidence whose maker parent is not the immutable run base commit',
       workItemDigest: claim.workItemDigest,
     })
     const commit = 'd2'.repeat(20)
-    const { maker, verifier, objectiveGate } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
+    const { maker, verifier, objectiveGate, makerRuntime } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
 
     assert.throws(
       () => recordEvidence({
@@ -598,6 +600,7 @@ test('rejects evidence whose maker parent is not the immutable run base commit',
         maker: { ...maker, parentCommit: 'e2'.repeat(20) },
         verifier,
         objectiveGate,
+        makerRuntime: canonicalMakerRuntime(),
         decision: 'pass',
       }),
       /MAKER_PARENT_MISMATCH/,
@@ -626,7 +629,7 @@ test('the append-only ledger rejects raw model/error output fields', () => {
     const objectiveGate = canonicalObjectiveGate({ runId: run.runId, commit })
 
     assert.throws(
-      () => recordEvidence({ paths, run, maker, verifier, objectiveGate, decision: 'pass' }),
+      () => recordEvidence({ paths, run, maker, verifier, objectiveGate, makerRuntime: canonicalMakerRuntime(), decision: 'pass' }),
       /unknown field "stdout"/,
     )
     assert.equal(existsSync(join(paths.evidence, `${run.runId}.json`)), false)
@@ -646,7 +649,7 @@ test('rejects unknown fields anywhere in maker, verifier, or objective-gate evid
       workItemDigest: claim.workItemDigest,
     })
     const commit = '5'.repeat(40)
-    const { maker, verifier, objectiveGate } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
+    const { maker, verifier, objectiveGate, makerRuntime } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
 
     assert.throws(
       () => recordEvidence({
@@ -654,6 +657,7 @@ test('rejects unknown fields anywhere in maker, verifier, or objective-gate evid
         maker: { ...maker, workspace: '/tmp/maker-workspace' },
         verifier,
         objectiveGate,
+        makerRuntime,
       }),
       /maker must not contain unknown field "workspace"/,
     )
@@ -663,6 +667,7 @@ test('rejects unknown fields anywhere in maker, verifier, or objective-gate evid
         maker,
         verifier: { ...verifier, command: 'node --test' },
         objectiveGate,
+        makerRuntime,
       }),
       /verifier must not contain unknown field "command"/,
     )
@@ -672,6 +677,7 @@ test('rejects unknown fields anywhere in maker, verifier, or objective-gate evid
         maker,
         verifier,
         objectiveGate: { ...objectiveGate, errors: ['boom'] },
+        makerRuntime,
       }),
       /objectiveGate must not contain unknown field "errors"/,
     )
@@ -681,6 +687,7 @@ test('rejects unknown fields anywhere in maker, verifier, or objective-gate evid
         maker: { ...maker, prompt: 'you are the maker...' },
         verifier,
         objectiveGate,
+        makerRuntime,
       }),
       /maker must not contain unknown field "prompt"/,
     )
@@ -701,7 +708,7 @@ test('rejects a non-boolean value nested inside the objective-gate checks map', 
       workItemDigest: claim.workItemDigest,
     })
     const commit = '6'.repeat(40)
-    const { maker, verifier, objectiveGate } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
+    const { maker, verifier, objectiveGate, makerRuntime } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
 
     assert.throws(
       () => recordEvidence({
@@ -710,6 +717,7 @@ test('rejects a non-boolean value nested inside the objective-gate checks map', 
         maker,
         verifier,
         objectiveGate: { ...objectiveGate, checks: { tests: { nested: true } } },
+        makerRuntime,
         decision: 'pass',
       }),
       /objectiveGate\.checks\.tests must be a boolean/,
@@ -730,7 +738,7 @@ test('rejects objective-gate check IDs outside the fixed transaction allowlist',
       workItemDigest: claim.workItemDigest,
     })
     const commit = '7'.repeat(40)
-    const { maker, verifier, objectiveGate } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
+    const { maker, verifier, objectiveGate, makerRuntime } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
 
     assert.throws(
       () => recordEvidence({
@@ -742,6 +750,7 @@ test('rejects objective-gate check IDs outside the fixed transaction allowlist',
           ...objectiveGate,
           checks: { ...PASSING_OBJECTIVE_CHECKS, arbitraryCheck: true },
         },
+        makerRuntime: canonicalMakerRuntime(),
         decision: 'pass',
       }),
       /unknown check ID "arbitraryCheck"/,
@@ -762,7 +771,7 @@ test('requires every fixed objective-gate check ID so passing evidence cannot om
       workItemDigest: claim.workItemDigest,
     })
     const commit = '71'.repeat(20)
-    const { maker, verifier, objectiveGate } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
+    const { maker, verifier, objectiveGate, makerRuntime } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
     const incompleteChecks = { ...PASSING_OBJECTIVE_CHECKS }
     delete incompleteChecks.originalClean
 
@@ -773,6 +782,7 @@ test('requires every fixed objective-gate check ID so passing evidence cannot om
         maker,
         verifier,
         objectiveGate: { ...objectiveGate, checks: incompleteChecks },
+        makerRuntime,
         decision: 'pass',
       }),
       /missing required check ID "originalClean"/,
@@ -797,7 +807,7 @@ test('rejects a maker artifactId that is not a sha256 hex digest', () => {
     const maker = canonicalMaker({ runId: run.runId, commit, artifactId: 'not-a-sha256-digest' })
 
     assert.throws(
-      () => recordEvidence({ paths, run, maker, verifier, objectiveGate, decision: 'pass' }),
+      () => recordEvidence({ paths, run, maker, verifier, objectiveGate, makerRuntime: canonicalMakerRuntime(), decision: 'pass' }),
       /maker\.artifactId must be a sha256 hex digest/,
     )
   })
@@ -816,19 +826,19 @@ test('rejects a verifier or objective-gate artifactId that does not match the ma
       workItemDigest: claim.workItemDigest,
     })
     const commit = '9'.repeat(40)
-    const { maker, verifier, objectiveGate } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
+    const { maker, verifier, objectiveGate, makerRuntime } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
     const otherArtifactId = createHash('sha256').update('a-different-artifact').digest('hex')
 
     assert.throws(
       () => recordEvidence({
-        paths, run, maker, objectiveGate, decision: 'pass',
+        paths, run, maker, objectiveGate, makerRuntime, decision: 'pass',
         verifier: { ...verifier, artifactId: otherArtifactId },
       }),
       /ARTIFACT_ID_MISMATCH/,
     )
     assert.throws(
       () => recordEvidence({
-        paths, run, maker, verifier, decision: 'pass',
+        paths, run, maker, verifier, makerRuntime, decision: 'pass',
         objectiveGate: { ...objectiveGate, artifactId: otherArtifactId },
       }),
       /ARTIFACT_ID_MISMATCH/,
@@ -849,18 +859,18 @@ test('rejects a maker, verifier, or objective-gate commit that is not a valid Gi
       workItemDigest: claim.workItemDigest,
     })
     const commit = 'b1'.repeat(20)
-    const { maker, verifier, objectiveGate } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
+    const { maker, verifier, objectiveGate, makerRuntime } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
 
     assert.throws(
       () => recordEvidence({
-        paths, run, verifier, objectiveGate, decision: 'pass',
+        paths, run, verifier, objectiveGate, makerRuntime, decision: 'pass',
         maker: { ...maker, commit: 'not-a-commit-hash' },
       }),
       /maker\.commit must be a Git commit hash/,
     )
     assert.throws(
       () => recordEvidence({
-        paths, run, verifier, objectiveGate, decision: 'pass',
+        paths, run, verifier, objectiveGate, makerRuntime, decision: 'pass',
         maker: { ...maker, parentCommit: 'not-a-commit-hash' },
       }),
       /maker\.parentCommit must be a Git commit hash/,
@@ -885,7 +895,7 @@ test('rejects a pass decision unless the verifier verdict is pass', () => {
     const verifier = canonicalVerifier({ runId: run.runId, commit, verdict: 'fail', score: 0 })
 
     assert.throws(
-      () => recordEvidence({ paths, run, maker, verifier, objectiveGate, decision: 'pass' }),
+      () => recordEvidence({ paths, run, maker, verifier, objectiveGate, makerRuntime: canonicalMakerRuntime(), decision: 'pass' }),
       /DECISION_PASS_REQUIRES_PASSING_VERIFIER_AND_OBJECTIVE_GATE/,
     )
   })
@@ -908,14 +918,16 @@ test('rejects a pass decision unless the objective gate is both checked and pass
 
     assert.throws(
       () => recordEvidence({
-        paths, run, maker, verifier, decision: 'pass',
+        paths, run, maker, verifier, makerRuntime: canonicalMakerRuntime(),
+ decision: 'pass',
         objectiveGate: canonicalObjectiveGate({ runId: run.runId, commit, checked: false, passed: false }),
       }),
       /DECISION_PASS_REQUIRES_PASSING_VERIFIER_AND_OBJECTIVE_GATE/,
     )
     assert.throws(
       () => recordEvidence({
-        paths, run, maker, verifier, decision: 'pass',
+        paths, run, maker, verifier, makerRuntime: canonicalMakerRuntime(),
+ decision: 'pass',
         objectiveGate: canonicalObjectiveGate({ runId: run.runId, commit, checked: true, passed: false }),
       }),
       /objectiveGate\.passed must agree with checked boolean checks/,
@@ -936,7 +948,7 @@ test('rejects a pass decision when any normalized objective check is false', () 
       workItemDigest: claim.workItemDigest,
     })
     const commit = 'd3'.repeat(20)
-    const { maker, verifier, objectiveGate } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
+    const { maker, verifier, objectiveGate, makerRuntime } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
 
     assert.throws(
       () => recordEvidence({
@@ -949,6 +961,7 @@ test('rejects a pass decision when any normalized objective check is false', () 
           passed: true,
           checks: { ...PASSING_OBJECTIVE_CHECKS, tests: false },
         },
+        makerRuntime,
         decision: 'pass',
       }),
       /objectiveGate\.passed must agree with checked boolean checks/,
@@ -969,7 +982,7 @@ test('rejects evidence over 256 KiB before creating an evidence file or ledger',
       workItemDigest: claim.workItemDigest,
     })
     const commit = 'd4'.repeat(20)
-    const { maker, verifier, objectiveGate } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
+    const { maker, verifier, objectiveGate, makerRuntime } = canonicalEvidenceArtifacts({ runId: run.runId, commit })
     const oversizedMaker = {
       ...maker,
       changedPaths: Array.from(
@@ -984,7 +997,7 @@ test('rejects evidence over 256 KiB before creating an evidence file or ledger',
         run,
         maker: oversizedMaker,
         verifier,
-        objectiveGate,
+        objectiveGate,        makerRuntime: canonicalMakerRuntime(),
         decision: 'pass',
       }),
       /evidence exceeds size limit/,
@@ -1010,7 +1023,7 @@ test('evidence is appended to the JSONL ledger without disturbing prior lines', 
     recordEvidence({
       paths,
       run: runOne,
-      ...canonicalEvidenceArtifacts({ runId: runOne.runId, commit: commitOne }),
+      ...canonicalEvidenceArtifacts({ runId: runOne.runId, commit: commitOne }),      makerRuntime: canonicalMakerRuntime(),
       decision: 'pass',
     })
 
@@ -1029,7 +1042,7 @@ test('evidence is appended to the JSONL ledger without disturbing prior lines', 
     recordEvidence({
       paths,
       run: runTwo,
-      ...canonicalEvidenceArtifacts({ runId: runTwo.runId, commit: commitTwo }),
+      ...canonicalEvidenceArtifacts({ runId: runTwo.runId, commit: commitTwo }),      makerRuntime: canonicalMakerRuntime(),
       decision: 'fail',
     })
 
@@ -1173,7 +1186,7 @@ test('evidence-directory symlink swaps are rejected before the target can be mut
       () => recordEvidence({
         paths,
         run,
-        ...canonicalEvidenceArtifacts({ runId: run.runId, commit }),
+        ...canonicalEvidenceArtifacts({ runId: run.runId, commit }),        makerRuntime: canonicalMakerRuntime(),
         decision: 'pass',
       }),
       /state path must not contain symbolic links/,
@@ -1201,7 +1214,7 @@ test('claim, resolve, and evidence recording never dirty the target repository',
     recordEvidence({
       paths,
       run,
-      ...canonicalEvidenceArtifacts({ runId: run.runId, commit }),
+      ...canonicalEvidenceArtifacts({ runId: run.runId, commit }),      makerRuntime: canonicalMakerRuntime(),
       decision: 'pass',
     })
     resolveWorkItem({ paths, workItemDigest: claim.workItemDigest, outcome: 'pass' })

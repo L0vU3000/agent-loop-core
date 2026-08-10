@@ -51,6 +51,12 @@ function createReadyFixture(directory) {
     pipeline: 'bug-fix',
     test: { executable: 'node', args: ['--test'] },
     allowedPaths: ['README.md'],
+    maker: {
+      provider: 'anthropic',
+      model: 'claude-sonnet-5',
+      timeoutMs: 300000,
+      maxTurns: 40,
+    },
   }))
   runGit(repositoryPath, ['init', '--quiet'])
   runGit(repositoryPath, ['add', '.'])

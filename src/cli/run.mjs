@@ -182,6 +182,10 @@ export async function runAgentLoopRun(options, {
   try {
     maker = createHermesMakerFn({
       executable: hermesExecutable,
+      provider: config.maker.provider,
+      model: config.maker.model,
+      timeoutMs: config.maker.timeoutMs,
+      maxTurns: config.maker.maxTurns,
       acknowledgeUnsandboxedCredentialAccess: options.acknowledgeUnsandboxedCredentialAccess === true,
       commandRunner,
     })
@@ -215,6 +219,7 @@ export async function runAgentLoopRun(options, {
       maker: transaction.maker,
       verifier: transaction.verifier,
       objectiveGate: transaction.objectiveGate,
+      makerRuntime: transaction.makerRuntime,
       decision,
     })
   } catch {

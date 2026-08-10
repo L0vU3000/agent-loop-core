@@ -226,6 +226,12 @@ function createTarget(demoRoot) {
     pipeline: 'bug-fix',
     test: { executable: process.execPath, args: ['--test', 'test/add.test.mjs'] },
     allowedPaths: ['src/add.mjs'],
+    maker: {
+      provider: 'anthropic',
+      model: 'claude-sonnet-5',
+      timeoutMs: 300_000,
+      maxTurns: 40,
+    },
   }, null, 2)}\n`)
 
   git(repositoryPath, 'init', '--quiet')

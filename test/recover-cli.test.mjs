@@ -17,9 +17,10 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { runAgentLoopRecover } from '../src/cli/recover.mjs'
-import { createRunIdentity, recordEvidence } from '../src/core/evidence.mjs'
+import { createRunIdentity, loadRecordedEvidence, recordEvidence } from '../src/core/evidence.mjs'
 import { claimWorkItem } from '../src/core/work-items.mjs'
 import { deriveRepositoryState } from '../src/paths/repository-state.mjs'
+import { canonicalMakerRuntime } from './helpers.mjs'
 
 const WORK_ITEM = '---\npipeline: bug-fix\n---\nRepair the bounded defect.\n'
 const CONFIG_DIGEST = createHash('sha256').update('config').digest('hex')
@@ -101,6 +102,7 @@ function fixture(directory) {
     maker,
     verifier,
     objectiveGate,
+    makerRuntime: canonicalMakerRuntime(),
     decision: 'pass',
   })
   return { repositoryPath, stateRoot, state, claim, run, evidence }
@@ -284,6 +286,72 @@ test('recovers evidence-persisted claim resolution without another maker call an
 
     const retry = runAgentLoopRecover({ repo: repositoryPath, stateRoot, runId: run.runId })
     assert.deepEqual(retry, first)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('recovery accepts valid schemaVersion 2 evidence and rejects missing or tampered runtime provenance', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'agent-loop-recover-test-'))
+  try {
+    const { repositoryPath, stateRoot, state, claim, run, evidence } = fixture(directory)
+    const headBefore = git(repositoryPath, 'rev-parse', 'HEAD')
+
+    const first = runAgentLoopRecover({ repo: repositoryPath, stateRoot, runId: run.runId })
+    assert.equal(first.exitCode, 0)
+    assert.equal(first.json.decision, 'pass')
+    assert.equal(existsSync(claim.claimedPath), false)
+    assert.equal(git(repositoryPath, 'rev-parse', 'HEAD'), headBefore)
+
+    // Tamper the ledger row's makerRuntime usage and require fail-closed reload.
+    const [ledgerRow] = readFileSync(state.paths.dispatchLog, 'utf8').trim().split('\n').map(JSON.parse)
+    const tamperedLedger = `${JSON.stringify({ ...ledgerRow, makerRuntime: { ...ledgerRow.makerRuntime, usage: { ...ledgerRow.makerRuntime.usage, apiCalls: 999 } } })}\n`
+    writeFileSync(state.paths.dispatchLog, tamperedLedger)
+    const tampered = runAgentLoopRecover({ repo: repositoryPath, stateRoot, runId: run.runId })
+    assert.equal(tampered.exitCode, 3)
+    assert.equal(tampered.json.error, 'RECORDED_EVIDENCE_UNAVAILABLE')
+    assert.equal(git(repositoryPath, 'rev-parse', 'HEAD'), headBefore)
+
+    // Remove makerRuntime from the evidence file and require fail-closed before any claim transition.
+    const serialized = readFileSync(evidence.evidencePath, 'utf8')
+    const parsed = JSON.parse(serialized)
+    const { makerRuntime: _, ...withoutRuntime } = parsed
+    writeFileSync(evidence.evidencePath, `${JSON.stringify(withoutRuntime, null, 2)}\n`)
+    const missing = runAgentLoopRecover({ repo: repositoryPath, stateRoot, runId: run.runId })
+    assert.equal(missing.exitCode, 3)
+    assert.equal(missing.json.error, 'RECORDED_EVIDENCE_UNAVAILABLE')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('the recover CLI rejects schemaVersion 1 evidence without invoking Hermes or mutating the target', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'agent-loop-recover-test-'))
+  try {
+    const { repositoryPath, stateRoot, state, claim, run } = fixture(directory)
+    const headBefore = git(repositoryPath, 'rev-parse', 'HEAD')
+    const serialized = readFileSync(join(state.paths.evidence, `${run.runId}.json`), 'utf8')
+    const parsed = JSON.parse(serialized)
+    const v1Record = { ...parsed, schemaVersion: 1 }
+    writeFileSync(join(state.paths.evidence, `${run.runId}.json`), `${JSON.stringify(v1Record, null, 2)}\n`)
+
+    const result = spawnSync(process.execPath, [
+      CLI,
+      'recover',
+      '--repo', repositoryPath,
+      '--state-root', stateRoot,
+      '--run-id', run.runId,
+      '--json',
+    ], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: { HOME: directory, PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' },
+    })
+
+    assert.equal(result.status, 3, result.stdout)
+    assert.deepEqual(JSON.parse(result.stdout), { schemaVersion: 1, error: 'RECORDED_EVIDENCE_UNAVAILABLE' })
+    assert.equal(existsSync(claim.claimedPath), true)
+    assert.equal(git(repositoryPath, 'rev-parse', 'HEAD'), headBefore)
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
