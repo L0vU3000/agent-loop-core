@@ -134,7 +134,6 @@ export function createHermesMaker({
   executable = 'hermes',
   model,
   provider,
-  maxTurns,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   acknowledgeUnsandboxedCredentialAccess = false,
   commandRunner = runCommand,
@@ -143,7 +142,7 @@ export function createHermesMaker({
     throw new HermesMakerError('HERMES_ACKNOWLEDGMENT_REQUIRED')
   }
 
-  const route = { provider, model, timeoutMs, maxTurns }
+  const route = { provider, model, timeoutMs }
   try {
     assertMakerRoute(route)
   } catch (error) {
@@ -163,7 +162,6 @@ export function createHermesMaker({
         '--usage-file', usagePath,
         '--model', route.model,
         '--provider', route.provider,
-        '--max-turns', String(route.maxTurns),
       ]
 
       const result = commandRunner(executable, args, {

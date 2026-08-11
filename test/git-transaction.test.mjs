@@ -123,7 +123,6 @@ function fixture(directory, options = {}) {
       provider: 'anthropic',
       model: 'claude-sonnet-5',
       timeoutMs: 300000,
-      maxTurns: 40,
     }),
   })
   return { repositoryRoot, baseCommit, state, claim, run, config }

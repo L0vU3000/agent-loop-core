@@ -11,12 +11,10 @@ const MAX_CONFIG_BYTES = 64 * 1024
 
 const TOP_LEVEL_KEYS = new Set(['schemaVersion', 'pipeline', 'test', 'allowedPaths', 'maker'])
 const TEST_KEYS = new Set(['executable', 'args'])
-const MAKER_KEYS = new Set(['provider', 'model', 'timeoutMs', 'maxTurns'])
+const MAKER_KEYS = new Set(['provider', 'model', 'timeoutMs'])
 const SAFE_MAKER_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u
 const MIN_MAKER_TIMEOUT_MS = 1_000
 const MAX_MAKER_TIMEOUT_MS = 3_600_000
-const MIN_MAKER_MAX_TURNS = 1
-const MAX_MAKER_MAX_TURNS = 200
 
 function validateTestCommand(testCommand) {
   if (!testCommand || typeof testCommand !== 'object' || Array.isArray(testCommand)) {
@@ -59,13 +57,6 @@ export function assertMakerRoute(maker) {
     || maker.timeoutMs > MAX_MAKER_TIMEOUT_MS
   ) {
     throw new Error(`maker.timeoutMs must be an integer between ${MIN_MAKER_TIMEOUT_MS} and ${MAX_MAKER_TIMEOUT_MS}`)
-  }
-  if (
-    !Number.isInteger(maker.maxTurns)
-    || maker.maxTurns < MIN_MAKER_MAX_TURNS
-    || maker.maxTurns > MAX_MAKER_MAX_TURNS
-  ) {
-    throw new Error(`maker.maxTurns must be an integer between ${MIN_MAKER_MAX_TURNS} and ${MAX_MAKER_MAX_TURNS}`)
   }
 }
 

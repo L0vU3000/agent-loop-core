@@ -94,9 +94,6 @@ test('rejects an invalid, missing, or unsafe maker route before returning a call
     { label: 'timeoutMs below minimum', overrides: { timeoutMs: 999 } },
     { label: 'timeoutMs above maximum', overrides: { timeoutMs: 3_600_001 } },
     { label: 'non-integer timeoutMs', overrides: { timeoutMs: 1.5 } },
-    { label: 'maxTurns below minimum', overrides: { maxTurns: 0 } },
-    { label: 'maxTurns above maximum', overrides: { maxTurns: 201 } },
-    { label: 'non-integer maxTurns', overrides: { maxTurns: 1.5 } },
   ]
 
   for (const { label, overrides } of invalidRoutes) {
@@ -105,7 +102,6 @@ test('rejects an invalid, missing, or unsafe maker route before returning a call
       () => createHermesMaker({
         model: 'fake-model',
         provider: 'fake-provider',
-        maxTurns: 40,
         timeoutMs: 30_000,
         acknowledgeUnsandboxedCredentialAccess: true,
         commandRunner: () => {
@@ -130,7 +126,6 @@ test('rejects an unsafe run ID before creating temporary state or invoking Herme
   const maker = createHermesMaker({
     model: 'fake-model',
     provider: 'fake-provider',
-    maxTurns: 40,
     acknowledgeUnsandboxedCredentialAccess: true,
     commandRunner: () => {
       invoked = true
@@ -164,7 +159,6 @@ test('runs in the exact maker workspace, excludes parent secrets, and returns no
         executable: fakeHermes,
         model: 'fake-model',
         provider: 'fake-provider',
-        maxTurns: 40,
         timeoutMs: 30_000,
         acknowledgeUnsandboxedCredentialAccess: true,
       })
@@ -230,7 +224,6 @@ test('binds the immutable run and work item, allowed paths, test command, and sa
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 17,
       timeoutMs: 12_345,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: succeedingCommandRunner({ capture: (call) => { captured = call } }),
@@ -247,7 +240,7 @@ test('binds the immutable run and work item, allowed paths, test command, and sa
     assert.equal(captured.args[toolsetsIndex + 1], 'terminal,file')
     assert.equal(captured.args[captured.args.indexOf('--model') + 1], 'fake-model')
     assert.equal(captured.args[captured.args.indexOf('--provider') + 1], 'fake-provider')
-    assert.equal(captured.args[captured.args.indexOf('--max-turns') + 1], '17')
+    assert.equal(captured.args.includes('--max-turns'), false)
     const prompt = captured.args[captured.args.indexOf('-z') + 1]
     assert.match(prompt, new RegExp(RUN.runId))
     assert.match(prompt, new RegExp(RUN.baseCommit))
@@ -287,7 +280,6 @@ process.stdout.write('done\\n')
         executable: fakeHermes,
         model: 'fake-model',
         provider: 'fake-provider',
-        maxTurns: 40,
         timeoutMs: 30_000,
         acknowledgeUnsandboxedCredentialAccess: true,
       })
@@ -315,7 +307,6 @@ test('reports a fixed failure message when the maker process times out', async (
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: () => Object.freeze({
         status: null,
@@ -346,7 +337,6 @@ test('reports a fixed failure message when the maker process exits nonzero', asy
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: () => Object.freeze({
         status: 1,
@@ -377,7 +367,6 @@ test('fails closed when producer outputBytes exceeds the canonical 1 MiB ceiling
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: (executable, args) => {
         const usageIndex = args.indexOf('--usage-file')
@@ -408,7 +397,6 @@ test('accepts producer outputBytes just below the canonical 1 MiB ceiling', asyn
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: (executable, args) => {
         const usageIndex = args.indexOf('--usage-file')
@@ -445,7 +433,6 @@ test('fails closed when usage apiCalls, totalTokens, or estimatedCostUsd are abo
       const maker = createHermesMaker({
         model: 'fake-model',
         provider: 'fake-provider',
-        maxTurns: 40,
         acknowledgeUnsandboxedCredentialAccess: true,
         commandRunner: (executable, args) => {
           const usageIndex = args.indexOf('--usage-file')
@@ -477,7 +464,6 @@ test('accepts usage values at the canonical maxima', async () => {
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: (executable, args) => {
         const usageIndex = args.indexOf('--usage-file')
@@ -515,7 +501,6 @@ test('reports a fixed failure message when Hermes cannot be spawned', async () =
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: () => Object.freeze({
         status: null,
@@ -545,7 +530,6 @@ test('reports a fixed failure message when the maker never writes usage evidence
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: () => Object.freeze({
         status: 0,
@@ -573,7 +557,6 @@ test('rejects usage evidence reached through a symbolic link', async () => {
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: (executable, args) => {
         const usageIndex = args.indexOf('--usage-file')
@@ -603,7 +586,6 @@ test('reports a fixed failure message when usage evidence exceeds the size limit
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: (executable, args) => {
         const usageIndex = args.indexOf('--usage-file')
@@ -633,7 +615,6 @@ test('rejects usage evidence reporting zero api calls before maker success', asy
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: (executable, args) => {
         const usageIndex = args.indexOf('--usage-file')
@@ -671,7 +652,6 @@ test('reports a fixed failure message when usage evidence is malformed', async (
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: (executable, args) => {
         const usageIndex = args.indexOf('--usage-file')
@@ -701,7 +681,6 @@ test('rejects usage evidence containing malformed UTF-8', async () => {
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: (executable, args) => {
         const usageIndex = args.indexOf('--usage-file')
@@ -736,7 +715,6 @@ test('reports a fixed failure message when usage evidence has a non-finite cost'
     const maker = createHermesMaker({
       model: 'fake-model',
       provider: 'fake-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: (executable, args) => {
         const usageIndex = args.indexOf('--usage-file')
@@ -769,7 +747,6 @@ test('fails closed when the maker reports usage for a different provider or mode
     const maker = createHermesMaker({
       model: 'configured-model',
       provider: 'configured-provider',
-      maxTurns: 40,
       acknowledgeUnsandboxedCredentialAccess: true,
       commandRunner: (executable, args) => {
         const usageIndex = args.indexOf('--usage-file')

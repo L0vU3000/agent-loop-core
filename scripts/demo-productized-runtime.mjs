@@ -230,7 +230,6 @@ function createTarget(demoRoot) {
       provider: 'anthropic',
       model: 'claude-sonnet-5',
       timeoutMs: 300_000,
-      maxTurns: 40,
     },
   }, null, 2)}\n`)
 

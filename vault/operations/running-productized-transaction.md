@@ -70,14 +70,16 @@ and the required maker route:
   "maker": {
     "provider": "anthropic",
     "model": "claude-sonnet-5",
-    "timeoutMs": 300000,
-    "maxTurns": 40
+    "timeoutMs": 300000
   }
 }
 ```
 
 Do not continue unless `healthy` is `true`. Doctor may report `sandbox.deferred` as a warning; that
 warning is not a readiness failure and is not a claim that containment exists.
+
+The maker is bounded by the configured wall-clock `timeoutMs`, not an exact turn cap. Successful
+runs bind the Hermes usage-file evidence described below into canonical transaction evidence.
 
 ## Credential and sandbox boundary
 

@@ -185,7 +185,6 @@ export async function runAgentLoopRun(options, {
       provider: config.maker.provider,
       model: config.maker.model,
       timeoutMs: config.maker.timeoutMs,
-      maxTurns: config.maker.maxTurns,
       acknowledgeUnsandboxedCredentialAccess: options.acknowledgeUnsandboxedCredentialAccess === true,
       commandRunner,
     })

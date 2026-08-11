@@ -171,7 +171,6 @@ test('adds', () => { assert.equal(add(2, 3), 5) })
       provider: 'anthropic',
       model: 'claude-sonnet-5',
       timeoutMs: 300000,
-      maxTurns: 40,
     },
   }))
 

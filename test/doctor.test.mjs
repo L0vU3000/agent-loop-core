@@ -55,7 +55,6 @@ function createReadyFixture(directory) {
       provider: 'anthropic',
       model: 'claude-sonnet-5',
       timeoutMs: 300000,
-      maxTurns: 40,
     },
   }))
   runGit(repositoryPath, ['init', '--quiet'])

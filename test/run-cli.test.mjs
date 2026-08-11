@@ -112,7 +112,6 @@ test('adds', () => { assert.equal(add(2, 3), 5) })
       provider: 'anthropic',
       model: 'claude-sonnet-5',
       timeoutMs: 300000,
-      maxTurns: 40,
     },
   }))
 
@@ -285,7 +284,6 @@ const CANONICAL_MAKER_CONFIG = Object.freeze({
   provider: 'anthropic',
   model: 'claude-sonnet-5',
   timeoutMs: 300_000,
-  maxTurns: 40,
 })
 
 function fakeConfig(overrides = {}) {
@@ -299,7 +297,7 @@ function fakeConfig(overrides = {}) {
   })
 }
 
-test('passes config.maker provider, model, timeoutMs, and maxTurns into createHermesMakerFn', async () => {
+test('passes exactly config.maker provider, model, and timeoutMs into createHermesMakerFn', async () => {
   let makerOptions
   const config = fakeConfig()
   const { defaults } = fakeStagePipeline({
@@ -322,7 +320,7 @@ test('passes config.maker provider, model, timeoutMs, and maxTurns into createHe
   assert.equal(makerOptions.provider, config.maker.provider)
   assert.equal(makerOptions.model, config.maker.model)
   assert.equal(makerOptions.timeoutMs, config.maker.timeoutMs)
-  assert.equal(makerOptions.maxTurns, config.maker.maxTurns)
+  assert.equal('maxTurns' in makerOptions, false)
   assert.equal(makerOptions.acknowledgeUnsandboxedCredentialAccess, true)
 })
 

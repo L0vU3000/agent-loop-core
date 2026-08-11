@@ -47,15 +47,15 @@ Create the target-owned configuration at `/absolute/path/to/target/.agent-loop/c
   "maker": {
     "provider": "anthropic",
     "model": "claude-sonnet-5",
-    "timeoutMs": 300000,
-    "maxTurns": 40
+    "timeoutMs": 300000
   }
 }
 ```
 
 Replace the test arguments and allowed paths with the smallest deterministic boundary for the
 repair. The test command is an executable plus literal argument array, not a shell command. Never
-put credentials in config, work items, source files, or test arguments.
+put credentials in config, work items, source files, or test arguments. Maker execution is bounded
+by the configured wall-clock `timeoutMs`; successful runs bind Hermes usage evidence.
 
 Choose an absolute state root outside the target and its Git metadata, then run the non-mutating
 preflight:
