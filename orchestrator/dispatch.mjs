@@ -31,8 +31,14 @@
 //                                                        # pipeline is re-verified here (fast
 //                                                        # objective gates); add --skip-gate to
 //                                                        # bypass for a quick manual record.
+//   node agent-loop/orchestrator/dispatch.mjs --record <file> pass --next <type>[,<type>]
+//                                                        # draw the graph EDGE: propose successor
+//                                                        # work item(s) under inbox/next/. Drafts
+//                                                        # only — nothing routes until a human
+//                                                        # writes the successor's exit condition
+//                                                        # and moves the file into inbox/.
 
-import { existsSync, readFileSync, readdirSync, renameSync, mkdirSync, appendFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, renameSync, mkdirSync, appendFileSync, statSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -179,6 +185,107 @@ export function recordOutcome(agentLoopRoot, file, outcome, summary = '') {
   }
 
   return { moved: `inbox/${archiveName}/${file}` }
+}
+
+// --- Graph edges: propose a successor after a PASS -------------------------------------------
+// The loop layer was already done: one pipeline = one node = explore→plan→execute→eval with its
+// own separate verifier. What had no representation anywhere was the layer above — an EDGE. A
+// research report that concludes "build X" used to die in done/ until a human retyped it as a new
+// ticket, so the hand-off existed only in someone's head. --next writes it down.
+//
+// Three properties keep an edge from quietly becoming an autonomous chain:
+//   - a draft lands in inbox/next/, which planDispatch CANNOT see (inboxItemFiles lists top-level
+//     *.md only), so it is inert until a human moves it into inbox/ — the same invariant that
+//     already hides done/, failed/, and in-progress/;
+//   - the draft deliberately carries NO "Done =" line, so check-work-item.mjs REJECTS it until
+//     someone writes the successor's own exit condition. A predecessor's exit condition must never
+//     be inherited — the next node has a different job, and a stale Done line is how a graph ships
+//     work nobody verified;
+//   - depth is capped, so research→spec→research cannot cycle forever ("set a spend cap and a
+//     hard bound" — a graph is many loops, and a weak verifier now burns tokens in parallel).
+//
+// State travels along the edge by REFERENCE, not by copy: the draft points at the predecessor's
+// archived file rather than inlining it. Keeps the successor's context lean (Horthy's dumb zone)
+// and keeps one source of truth for what the upstream node actually said.
+export const MAX_GRAPH_DEPTH = 4
+
+export function proposeNext(agentLoopRoot, file, types, { summary = '', today = new Date().toISOString().slice(0, 10) } = {}) {
+  assertPlainInboxFilename(file)
+  if (!Array.isArray(types) || types.length === 0) {
+    throw new Error('--next needs at least one registered pipeline type')
+  }
+
+  const registry = validatePipelineRegistry(agentLoopRoot)
+  if (!registry.ok) {
+    throw new Error(`refusing to propose an edge — the pipeline registry is broken: ${registry.errors[0]}`)
+  }
+  const byType = new Map(registry.definitions.map((definition) => [definition.type, definition]))
+
+  const inboxDirectory = join(agentLoopRoot, 'orchestrator', 'inbox')
+  // Called right after recordOutcome, so the predecessor already sits in done/. Fall back to the
+  // top-level inbox for a caller that proposes before recording.
+  const archived = join(inboxDirectory, 'done', file)
+  const source = existsSync(archived) ? archived : join(inboxDirectory, file)
+  if (!existsSync(source)) {
+    throw new Error(`predecessor item not found: ${file}`)
+  }
+  const predecessor = parseItemFrontmatter(readFileSync(source, 'utf8')) || {}
+
+  const depth = Number(predecessor.depth || 0) + 1
+  if (!Number.isFinite(depth) || depth > MAX_GRAPH_DEPTH) {
+    throw new Error(`graph depth ${depth} exceeds the cap of ${MAX_GRAPH_DEPTH} — restate the goal as a fresh item instead of adding another hop`)
+  }
+
+  const nextDirectory = join(inboxDirectory, 'next')
+  mkdirSync(nextDirectory, { recursive: true })
+
+  const written = []
+  const skipped = []
+  for (const type of types) {
+    const pipeline = byType.get(type)
+    if (!pipeline) {
+      throw new Error(`no pipeline registered for type "${type}"`)
+    }
+    const name = `${file.replace(/\.md$/, '')}--${type}.md`
+    const target = join(nextDirectory, name)
+    // Never clobber a draft someone has already started editing.
+    if (existsSync(target)) {
+      skipped.push(`inbox/next/${name}`)
+      continue
+    }
+    writeFileSync(target, draftSuccessor({ pipeline, type, predecessorFile: file, predecessor, depth, summary, today }))
+    written.push(`inbox/next/${name}`)
+  }
+  return { written, skipped, depth }
+}
+
+// Deliberately has no "Done =" line — see the note above. check-work-item.mjs is the arming gate.
+function draftSuccessor({ pipeline, type, predecessorFile, predecessor, depth, summary, today }) {
+  return `---
+category: ${pipeline.category}
+type: ${type}
+priority: ${predecessor.priority || 'normal'}
+created: ${today}
+from: ${predecessorFile}
+depth: ${depth}
+---
+
+Proposed successor: \`${predecessorFile}\` passed and hands off to the **${pipeline.name}** pipeline.
+
+- Upstream outcome: ${summary || '(no summary recorded)'}
+- Upstream item: \`orchestrator/inbox/done/${predecessorFile}\` — read it for the original objective,
+  and its pipeline's \`runs/<run-id>/\` folder for the evidence this hand-off rests on.
+
+TODO before this can route: replace this paragraph with the exit condition for THIS node — one
+line a fresh verifier could check without you. The upstream exit condition is not inherited; this
+node has a different job. Then move the file into \`orchestrator/inbox/\` and validate it with
+\`node agent-loop/orchestrator/check-work-item.mjs\`.
+
+## Do NOT
+
+- inherit the upstream scope wholesale — restate what this node must produce.
+- widen the work because the upstream run found something adjacent; that is a separate item.
+`
 }
 
 // --- Item claim: mark an item in-progress atomically at dispatch time ------------------------
@@ -357,7 +464,7 @@ function runCli() {
     const summaryIndex = args.indexOf('--summary')
     const summary = summaryIndex !== -1 ? args[summaryIndex + 1] : ''
     if (!file || !outcome) {
-      process.stderr.write('usage: --record <file> <pass|fail> [--summary "..."] [--skip-gate]\n')
+      process.stderr.write('usage: --record <file> <pass|fail> [--summary "..."] [--skip-gate] [--next <type>[,<type>]]\n')
       process.exitCode = 1
       return
     }
@@ -390,6 +497,29 @@ function runCli() {
       }
     } catch (error) {
       process.stderr.write(`metrics harvest skipped: ${error.message}\n`)
+    }
+
+    // Graph edge. Proposed off the DECIDED outcome, not the claimed one — an edge must never be
+    // drawn out of a pass the record gate just overruled. Never blocks the record: the outcome is
+    // already saved, and a failed hand-off is a note to a human, not a lost run.
+    const nextIndex = args.indexOf('--next')
+    if (nextIndex !== -1) {
+      const types = (args[nextIndex + 1] || '').split(',').map((type) => type.trim()).filter(Boolean)
+      if (decision.outcome !== 'pass') {
+        process.stderr.write('--next ignored: an edge is only drawn from a recorded pass\n')
+      } else {
+        try {
+          const edge = proposeNext(root, file, types, { summary: finalSummary })
+          for (const draft of edge.written) {
+            process.stdout.write(`edge: proposed ${draft} (depth ${edge.depth}) — write its exit condition, then move it into orchestrator/inbox/\n`)
+          }
+          for (const draft of edge.skipped) {
+            process.stdout.write(`edge: ${draft} already exists — left untouched\n`)
+          }
+        } catch (error) {
+          process.stderr.write(`edge not proposed: ${error.message}\n`)
+        }
+      }
     }
     return
   }

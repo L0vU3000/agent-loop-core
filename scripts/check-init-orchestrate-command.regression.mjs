@@ -56,3 +56,28 @@ test('init preserves a consuming project command that already exists', () => {
     rmSync(project, { recursive: true, force: true })
   }
 })
+
+// Adding a queue directory without teaching init to clear it is the recurring bug this guards:
+// stale instance data rides into a fresh project and looks like real work. Assert EVERY queue
+// directory is reset, so the next one added fails here instead of in someone's new repo.
+test('init clears stale items from every inbox queue directory', () => {
+  const { project, agentLoop } = makeProject()
+  try {
+    const queues = ['', 'done', 'failed', 'in-progress', 'next']
+    const stale = queues.map((queue) => {
+      const directory = join(agentLoop, 'orchestrator', 'inbox', queue)
+      mkdirSync(directory, { recursive: true })
+      const file = join(directory, 'zz-stale.md')
+      writeFileSync(file, '---\ncategory: maintenance\ntype: lint\n---\n\nleftover from another project\n')
+      return file
+    })
+
+    runInit(agentLoop)
+
+    for (const file of stale) {
+      assert.equal(existsSync(file), false, `init must clear stale instance data at ${file}`)
+    }
+  } finally {
+    rmSync(project, { recursive: true, force: true })
+  }
+})
