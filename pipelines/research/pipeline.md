@@ -138,3 +138,12 @@ separately — research informs that decision, it does not make it.
 Authored, not yet proven — a planning pipeline alongside `spec`. Invoke `workflow.js` with a
 `type: research` ticket path. Its proof waits for a real question whose answer can be checked
 against resolving sources; it must not be exercised on a build request dressed up as a question.
+
+## Delegation status
+
+`execute` may run as a **team** per [`../DELEGATION.md`](../DELEGATION.md). The team layer is in
+**locked training mode**: the caps, desk check, and bounded rework are proven deterministically by
+`scripts/check-delegation.regression.mjs`, but no lead has yet split a real question against a live
+model. This pipeline is read-only, so a bad split wastes tokens rather than corrupting anything —
+which is why it is the intended first live proof. Check the run for duplicated `notes-*.md` and for
+claims in `report.md` that no note carried.

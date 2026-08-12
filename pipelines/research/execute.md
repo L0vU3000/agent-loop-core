@@ -6,6 +6,23 @@ the live orchestrator inbox. The installed `deep-research` skill and `/investiga
 drafting engines: fan out searches, fetch and read the sources, verify claims against them as you
 go, then synthesize.
 
+## Running as a team
+
+This stage runs as a **team** when the work splits, and solo when it doesn't. The shared rules are
+in [`../DELEGATION.md`](../DELEGATION.md).
+
+**As the LEAD:** split into independent sub-questions — independent means neither needs the other's
+output. **One, or none → solo path:** do the work yourself, per the rules below. That is the default
+and it is not a failure. Otherwise delegate one sub-question per worker, **desk-check** each returned
+piece before accepting it (does the evidence hold up? does it answer what was asked? is it inside
+scope?), then synthesize the accepted `notes-*.md` into `report.md` + `sources.md`. Reject with a specific, actionable reason — you review, you don't redo the
+work. A rejected sub-question gets **one** rework; still rejected, declare it openly in the report rather
+than papering over it. This pipeline is read-only, so workers cannot collide — but the worker cap
+and rework bound are still enforced by `workflow.js`, not by your judgment.
+
+**As a worker (or solo):** stay inside your sub-question; another worker owns the rest. **Never delegate** —
+there is no third level. Write into the one shared `runs/<run-id>/`; do not mint your own run-id.
+
 ## Write `runs/<run-id>/report.md`
 
 Fill every section the plan named, and no more:

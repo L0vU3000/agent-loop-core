@@ -130,6 +130,12 @@ async function runFeatureWorkflow({
       return plan
     }
 
+    // The lead's split. These tests cover the Eval scoring contract, so they take the solo path
+    // deliberately — pipelines/DELEGATION.md's own rules live in check-delegation.regression.mjs.
+    if (options.label.startsWith('split#')) {
+      return { tasks: [], reason: 'solo path — scoring regression' }
+    }
+
     if (options.label.startsWith('execute#')) {
       return {}
     }
@@ -143,8 +149,8 @@ async function runFeatureWorkflow({
     throw new Error(`Unexpected agent label: ${options.label}`)
   }
 
-  const executeWorkflow = new AsyncFunction('args', 'phase', 'agent', 'log', executableSource)
-  const result = await executeWorkflow('', () => {}, agent, (message) => logs.push(message))
+  const executeWorkflow = new AsyncFunction('args', 'phase', 'agent', 'log', 'pipeline', executableSource)
+  const result = await executeWorkflow('', () => {}, agent, (message) => logs.push(message), async () => [])
 
   return { events, logs, prompts, result }
 }
@@ -281,7 +287,7 @@ test('feature workflow passes a complete valid Eval', async () => {
   const { events, result } = await runFeatureWorkflow()
 
   assert.equal(result.built, true)
-  assert.deepEqual(events, ['explore', 'plan#1', 'execute#1', 'eval#1'])
+  assert.deepEqual(events, ['explore', 'plan#1', 'split#1', 'execute#1', 'eval#1'])
 })
 
 test('feature workflow fails below threshold and returns failed evidence to Plan before another Execute', async () => {
@@ -298,9 +304,11 @@ test('feature workflow fails below threshold and returns failed evidence to Plan
   assert.deepEqual(events, [
     'explore',
     'plan#1',
+    'split#1',
     'execute#1',
     'eval#1',
     'plan#2',
+    'split#2',
     'execute#2',
     'eval#2',
   ])
@@ -325,7 +333,8 @@ test('feature workflow fails a high score when a critical criterion fails', asyn
   })
 
   assert.equal(result.built, true)
-  assert.equal(events[4], 'plan#2')
+  // Intent, not position: the stage right after the first Eval must be Plan again.
+  assert.equal(events[events.indexOf('eval#1') + 1], 'plan#2')
 })
 
 test('feature workflow rejects new ESLint warnings even when the score is high', async () => {
@@ -340,7 +349,8 @@ test('feature workflow rejects new ESLint warnings even when the score is high',
   })
 
   assert.equal(result.built, true)
-  assert.equal(events[4], 'plan#2')
+  // Intent, not position: the stage right after the first Eval must be Plan again.
+  assert.equal(events[events.indexOf('eval#1') + 1], 'plan#2')
 })
 
 test('feature workflow stops for human approval when Plan changes the locked rubric', async () => {
@@ -355,7 +365,7 @@ test('feature workflow stops for human approval when Plan changes the locked rub
 
   assert.equal(result.built, false)
   assert.equal(result.rubricChangeNeedsApproval, true)
-  assert.deepEqual(events, ['explore', 'plan#1', 'execute#1', 'eval#1', 'plan#2'])
+  assert.deepEqual(events, ['explore', 'plan#1', 'split#1', 'execute#1', 'eval#1', 'plan#2'])
 })
 
 test('feature workflow stops for human approval when Eval observes a changed rubric fingerprint', async () => {
@@ -368,7 +378,7 @@ test('feature workflow stops for human approval when Eval observes a changed rub
 
   assert.equal(result.built, false)
   assert.equal(result.rubricChangeNeedsApproval, true)
-  assert.deepEqual(events, ['explore', 'plan#1', 'execute#1', 'eval#1'])
+  assert.deepEqual(events, ['explore', 'plan#1', 'split#1', 'execute#1', 'eval#1'])
 })
 
 test('feature workflow stops for human approval when Eval changes the locked threshold', async () => {
@@ -381,5 +391,5 @@ test('feature workflow stops for human approval when Eval changes the locked thr
 
   assert.equal(result.built, false)
   assert.equal(result.rubricChangeNeedsApproval, true)
-  assert.deepEqual(events, ['explore', 'plan#1', 'execute#1', 'eval#1'])
+  assert.deepEqual(events, ['explore', 'plan#1', 'split#1', 'execute#1', 'eval#1'])
 })

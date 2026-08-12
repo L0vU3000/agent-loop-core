@@ -10,6 +10,8 @@ pipelines/*/runs/*
 orchestrator/inbox/*.md
 orchestrator/inbox/done/*.md
 orchestrator/inbox/failed/*.md
+orchestrator/inbox/in-progress/*.md
+orchestrator/inbox/next/*.md
 orchestrator/done/*.md
 
 # Machinery-generated state
