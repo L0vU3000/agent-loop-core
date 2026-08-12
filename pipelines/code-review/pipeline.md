@@ -139,3 +139,11 @@ owner's discretion.
 Authored, not yet proven — the first review pipeline. Invoke `workflow.js` with a
 `type: code-review` ticket path that names the target branch, diff, or PR. Its proof waits for a
 real change to review; it must not be exercised on an empty or fabricated target.
+
+## Delegation status
+
+`execute` may run as a **team** per [`../DELEGATION.md`](../DELEGATION.md). The team layer is in
+**locked training mode**: the caps, desk check, and bounded rework are proven deterministically by
+`scripts/check-delegation.regression.mjs`, but no lead has yet split a real review against a live
+model. Watch for lenses that overlap into the same finding, and for a desk check that accepts
+everything — a filter that never rejects is not a filter.

@@ -63,3 +63,12 @@ red-first step guards against tests that vacuously pass; the global gates guard 
 - **First feature — by hand** to prove the specify→build→verify shape, then automate via
   `workflow.js`.
 - Failures / surprises → [`../../memory/errors.md`](../../memory/errors.md).
+
+## Delegation status
+
+`execute` may run as a **team** per [`../DELEGATION.md`](../DELEGATION.md). The team layer is in
+**locked training mode**: its caps, file-disjointness rule, desk check, and bounded rework are
+proven deterministically by `scripts/check-delegation.regression.mjs`, but no lead has yet produced
+a split against a live model. Whether a split is *good* — genuinely independent, not duplicated
+work — is unproven until a real ticket runs. Until then, expect and accept the solo path, and read
+every delegated run's `execute.md` before trusting its split.
