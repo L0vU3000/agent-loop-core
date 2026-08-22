@@ -31,6 +31,17 @@
 //                                                        # pipeline is re-verified here (fast
 //                                                        # objective gates); add --skip-gate to
 //                                                        # bypass for a quick manual record.
+//                                                        # A claimed PASS on an item whose
+//                                                        # frontmatter sets uiReview: true is
+//                                                        # additionally refused unless
+//                                                        # --review-run <id> --review-commit <sha>
+//                                                        # --review-digest <digest> cite an
+//                                                        # APPROVED review-gate.mjs record whose
+//                                                        # commit + digest match exactly AND this
+//                                                        # repository's current HEAD still equals
+//                                                        # that commit. --skip-gate does NOT bypass
+//                                                        # this — it only bypasses the objective
+//                                                        # machinery+tsc gate above.
 //   node agent-loop/orchestrator/dispatch.mjs --record <file> pass --next <type>[,<type>]
 //                                                        # draw the graph EDGE: propose successor
 //                                                        # work item(s) under inbox/next/. Drafts
@@ -45,6 +56,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { validatePipelineRegistry } from '../scripts/check-pipeline-registry.mjs'
 import { collectMetrics } from './metrics.mjs'
+import { getReview } from './review-gate.mjs'
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url))
 const DEFAULT_AGENT_LOOP_ROOT = resolve(SCRIPT_DIRECTORY, '..')
@@ -365,6 +377,21 @@ export function itemCategory(agentLoopRoot, file) {
   return frontmatter?.category ?? null
 }
 
+// Whether an item opted into the human UI/UX approval gate (see review-gate.mjs and
+// pipelines/feature/workflow.js's Specify stage, which threads `uiReview: true` through from
+// the ticket's frontmatter). Same claimed-first, top-level-second resolution as itemCategory —
+// this is read at record time, when the item may already have been claimed into in-progress/.
+// A missing file or frontmatter is "no" rather than an error: the record gate should never be
+// the thing an operator has to fight to record an item that dispatch would already reject.
+export function itemRequiresUiReview(agentLoopRoot, file) {
+  const inboxDirectory = join(agentLoopRoot, 'orchestrator', 'inbox')
+  const claimedSource = join(inboxDirectory, 'in-progress', file)
+  const source = existsSync(claimedSource) ? claimedSource : join(inboxDirectory, file)
+  if (!existsSync(source)) return false
+  const frontmatter = parseItemFrontmatter(readFileSync(source, 'utf8'))
+  return frontmatter?.uiReview === 'true'
+}
+
 // Run one objective check. A non-zero EXIT (error.status is a number) means it ran and failed —
 // a real signal. A spawn error (no status, e.g. ENOENT) means it could not run — not a failure.
 function runCheck(command, commandArgs, cwd) {
@@ -405,6 +432,92 @@ export function decideRecord({ claimed, gate, skipGate }) {
   }
   if (gate.passed) return { outcome: 'pass', note: '' }
   return { outcome: 'fail', note: `verdict overruled by record gate: ${gate.detail}` }
+}
+
+// The UI review acceptance boundary: a claimed pass on a `uiReview: true` item is refused unless
+// the durable review-gate record for the cited run is `approved` AND the cited commit + digest
+// are the EXACT ones on that approved record AND the consuming repository's current HEAD is
+// still that commit (a later commit invalidates an otherwise-valid approval — it approved a
+// screenshot of a build that no longer exists). Read-only: never mutates the review-gate state,
+// only judges evidence already submitted/decided through review-gate.mjs.
+export function checkUiReviewApproval(agentLoopRoot, { runId, commitSha, digest, currentHead } = {}) {
+  if (!runId || !commitSha || !digest || !currentHead) {
+    return { ok: false, reason: 'UI review evidence missing: runId, commitSha, digest, and the current HEAD are all required' }
+  }
+
+  const record = getReview(agentLoopRoot, runId)
+  if (!record) {
+    return { ok: false, reason: `no review submission found for run "${runId}"` }
+  }
+
+  if (record.status !== 'approved') {
+    return { ok: false, reason: `UI review for run "${runId}" is not approved (status: ${record.status})` }
+  }
+
+  const normalizedCommitSha = commitSha.toLowerCase()
+  if (record.commitSha !== normalizedCommitSha || record.digest !== digest) {
+    return {
+      ok: false,
+      reason: `UI review evidence for run "${runId}" does not match the approved record `
+        + `(approved commit ${record.commitSha}, digest ${record.digest})`,
+    }
+  }
+
+  const normalizedHead = currentHead.toLowerCase()
+  if (normalizedHead !== record.commitSha) {
+    return {
+      ok: false,
+      reason: `current HEAD ${normalizedHead} does not match the approved commit ${record.commitSha} for run "${runId}"`,
+    }
+  }
+
+  return { ok: true, reason: '' }
+}
+
+// The real record doorway: recordOutcome plus everything that must happen BEFORE a claimed
+// outcome is trusted enough to move. Order matters — the UI review gate is checked first and is
+// NEVER subject to --skip-gate (that flag only bypasses the objective machinery+tsc gate below),
+// so a UI-gated item can never slip through on "quick manual record".
+export function recordClaimedOutcome(agentLoopRoot, file, outcome, options = {}) {
+  const {
+    summary = '',
+    skipGate = false,
+    reviewRunId = '',
+    reviewCommitSha = '',
+    reviewDigest = '',
+    currentHead = '',
+  } = options
+
+  if (outcome === 'pass' && itemRequiresUiReview(agentLoopRoot, file)) {
+    const approval = checkUiReviewApproval(agentLoopRoot, {
+      runId: reviewRunId, commitSha: reviewCommitSha, digest: reviewDigest, currentHead,
+    })
+    if (!approval.ok) {
+      throw new Error(`UI review gate refused: ${approval.reason}`)
+    }
+  }
+
+  const category = outcome === 'pass' && !skipGate ? itemCategory(agentLoopRoot, file) : null
+  const gate = category && isGateBearing(category) ? runFastGates(agentLoopRoot) : null
+  const decision = decideRecord({ claimed: outcome, gate, skipGate })
+  const finalSummary = decision.note
+    ? (summary ? `${decision.note} | claimed: ${summary}` : decision.note)
+    : summary
+
+  const result = recordOutcome(agentLoopRoot, file, decision.outcome, finalSummary)
+  return { decision, gate, finalSummary, moved: result.moved }
+}
+
+// The consuming repository's current commit, used to check a UI review approval has not gone
+// stale (see checkUiReviewApproval). Best-effort like runFastGates' checks: an environment where
+// git cannot be run yields '' rather than throwing, so checkUiReviewApproval's own evidence-missing
+// path is what refuses the record, with a clear reason instead of a raw spawn error.
+function currentGitHead(agentLoopRoot) {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: resolve(agentLoopRoot, '..') }).toString().trim()
+  } catch {
+    return ''
+  }
 }
 
 function cliRoot() {
@@ -464,17 +577,39 @@ function runCli() {
     const summaryIndex = args.indexOf('--summary')
     const summary = summaryIndex !== -1 ? args[summaryIndex + 1] : ''
     if (!file || !outcome) {
-      process.stderr.write('usage: --record <file> <pass|fail> [--summary "..."] [--skip-gate] [--next <type>[,<type>]]\n')
+      process.stderr.write(
+        'usage: --record <file> <pass|fail> [--summary "..."] [--skip-gate]\n'
+        + '       [--review-run <id> --review-commit <sha> --review-digest <digest>] [--next <type>[,<type>]]\n',
+      )
       process.exitCode = 1
       return
     }
 
     // Re-verify a claimed PASS before trusting it. Only code-changing pipelines have objective
-    // gates; read-only ones are recorded as-is. --skip-gate bypasses for a quick manual record.
+    // gates; read-only ones are recorded as-is. --skip-gate bypasses for a quick manual record —
+    // but never bypasses the UI review gate below (recordClaimedOutcome enforces that ordering).
     const skipGate = args.includes('--skip-gate')
-    const category = outcome === 'pass' && !skipGate ? itemCategory(root, file) : null
-    const gate = category && isGateBearing(category) ? runFastGates(root) : null
-    const decision = decideRecord({ claimed: outcome, gate, skipGate })
+    const reviewRunIndex = args.indexOf('--review-run')
+    const reviewCommitIndex = args.indexOf('--review-commit')
+    const reviewDigestIndex = args.indexOf('--review-digest')
+
+    let outcomeResult
+    try {
+      outcomeResult = recordClaimedOutcome(root, file, outcome, {
+        summary,
+        skipGate,
+        reviewRunId: reviewRunIndex !== -1 ? args[reviewRunIndex + 1] : '',
+        reviewCommitSha: reviewCommitIndex !== -1 ? args[reviewCommitIndex + 1] : '',
+        reviewDigest: reviewDigestIndex !== -1 ? args[reviewDigestIndex + 1] : '',
+        currentHead: currentGitHead(root),
+      })
+    } catch (error) {
+      process.stderr.write(`record refused: ${error.message}\n`)
+      process.exitCode = 1
+      return
+    }
+
+    const { decision, gate, finalSummary, moved } = outcomeResult
     if (decision.outcome !== outcome) {
       process.stderr.write(`record gate: claimed ${outcome} but ${gate.detail} — recording ${decision.outcome}\n`)
     } else if (gate && gate.checked) {
@@ -482,12 +617,8 @@ function runCli() {
     } else if (outcome === 'pass' && !skipGate) {
       process.stdout.write(`record gate: skipped (${gate ? gate.detail : 'read-only pipeline'})\n`)
     }
-    const finalSummary = decision.note
-      ? (summary ? `${decision.note} | claimed: ${summary}` : decision.note)
-      : summary
 
-    const result = recordOutcome(root, file, decision.outcome, finalSummary)
-    process.stdout.write(`recorded ${decision.outcome}: moved to ${result.moved}\n`)
+    process.stdout.write(`recorded ${decision.outcome}: moved to ${moved}\n`)
     // Harvest the runtime's cost/quality telemetry for any finished run into the ledger. A
     // hiccup here must never block the record itself — the outcome is already saved.
     try {
