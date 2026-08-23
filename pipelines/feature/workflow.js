@@ -80,6 +80,7 @@ const SPEC = { type: 'object', required: ['specified', 'runId'],
     runId: { type: 'string' },
     testPath: { type: 'string' },
     criteria: { type: 'string' },
+    uiReview: { type: 'boolean' },
     note: { type: 'string' },
   } }
 
@@ -107,6 +108,22 @@ const VERDICT = { type: 'object', required: ['verdict', 'score', 'passThreshold'
     reason: { type: 'string' },
   } }
 
+// Opt-in human UI/UX approval gate (see ../../orchestrator/review-gate.md). Runs only after
+// Eval passes, and only when the ticket set `uiReview: true`. The agent itself submits the
+// packet and attempts the Telegram notification — this workflow has no filesystem/process
+// access of its own, so it can only orchestrate and read back what the agent reports.
+const REVIEW = { type: 'object', required: ['submitted', 'commitSha', 'digest', 'notified'],
+  properties: {
+    submitted: { type: 'boolean' },
+    commitSha: { type: 'string' },
+    digest: { type: 'string' },
+    routes: { type: 'array', items: { type: 'string' } },
+    viewports: { type: 'array', items: { type: 'string' } },
+    notified: { type: 'boolean' },
+    notifyDetail: { type: 'string' },
+    reason: { type: 'string' },
+  } }
+
 phase('Specify')
 const spec = await agent(
   `You are the EXPLORE stage of the feature pipeline. Follow ${P}/explore.md.
@@ -115,9 +132,12 @@ const spec = await agent(
    \`mkdir -p ${P}/runs/<run-id>\` — every later stage writes ONLY into that folder.
    Use \`graphify query\` to orient before reading code. Extract the ticket's acceptance
    criteria and write FAILING acceptance test(s) that encode them (confirm they are red for
-   the right reason — the feature is missing). Return specified, runId, testPath, and a
-   one-line criteria summary. If the criteria are ambiguous, set specified=false and explain
-   in note — do not invent product behavior.`,
+   the right reason — the feature is missing). Also read the ticket's frontmatter for
+   \`uiReview: true\` (see ../../orchestrator/orchestrator.md's inbox contract) — a
+   UI-affecting feature opts into a human UI/UX approval gate that runs after Eval passes.
+   Return specified, runId, testPath, uiReview (default false if the ticket does not set
+   it), and a one-line criteria summary. If the criteria are ambiguous, set specified=false
+   and explain in note — do not invent product behavior.`,
   { label: 'explore', schema: SPEC, ...TIER.read })
 
 if (!spec.specified) {
@@ -261,10 +281,51 @@ while (i < MAX) {
     return { built: false, rubricChangeNeedsApproval: true, iterations: i, runId: RUN }
   }
 
-  if (v.verdict === 'pass' && v.rubricValid && v.rubricSha256 === lockedRubricSha256 && v.passThreshold === lockedPassThreshold && v.score >= lockedPassThreshold && v.criticalFailures === 0 && v.acceptancePasses && v.suiteGreen && v.tscErrors === 0 && v.noNewEslintWarnings) {
+  const evalPassed = v.verdict === 'pass' && v.rubricValid && v.rubricSha256 === lockedRubricSha256 && v.passThreshold === lockedPassThreshold && v.score >= lockedPassThreshold && v.criticalFailures === 0 && v.acceptancePasses && v.suiteGreen && v.tscErrors === 0 && v.noNewEslintWarnings
+
+  if (evalPassed && !spec.uiReview) {
     log(`DONE: feature built and guarded by ${spec.testPath}`)
     return { built: true, iterations: i, testPath: spec.testPath, runId: RUN }
   }
+
+  if (evalPassed && spec.uiReview) {
+    const review = await agent(
+      `You are the UI-REVIEW stage — a human UI/UX approval gate for a feature that opted in via
+       \`uiReview: true\`. Eval has already passed at iteration ${i}; your job is to package
+       evidence for a human reviewer and submit it, not to re-judge the build.
+       1. Capture screenshots or other visual artifacts of the affected routes at the relevant
+          viewports (at least one mobile and one desktop viewport) and save them under
+          \`${P}/runs/${RUN}/screenshots/\`.
+       2. Record the exact current commit with \`git rev-parse HEAD\` — this is the commit the
+          human is approving, so it must be precise.
+       3. Submit the packet with:
+          \`node orchestrator/review-gate.mjs --submit --run ${RUN} --commit <sha> --artifact <path> [...] --route <route> [...] --viewport <viewport> [...]\`
+          and read back the digest it prints.
+       4. Send the captured screenshot files as media/image attachments to the configured
+          Telegram chat, alongside the commit and digest, using whatever Hermes messaging tool is
+          available to you — a pointer to where the files live is not enough, the human reviewer
+          needs the images themselves in the chat. If no Hermes messaging tool capable of media
+          attachments is available to you, do NOT claim the screenshots were delivered or sent —
+          report that media messaging tooling was unavailable and return notified=false with a
+          reason instead of guessing.
+       Return submitted, commitSha (the exact 40-char SHA), digest (from review-gate.mjs's
+       output), routes, viewports, notified, and notifyDetail (what happened when you tried to
+       notify, or why you could not).`,
+      { label: `ui-review#${i}`, phase: 'Build loop', schema: REVIEW, ...TIER.verify })
+
+    if (!review.submitted) {
+      log(`STOP: UI review packet could not be submitted — ${review.reason || 'see ui-review notes'}`)
+      return { built: false, uiReviewRequired: true, uiReviewSubmitted: false, iterations: i, runId: RUN, reason: review.reason }
+    }
+
+    log(`AWAITING HUMAN APPROVAL: UI review packet submitted for commit ${review.commitSha} (digest ${review.digest})${review.notified ? '' : ' — Telegram notify not confirmed'}`)
+    return {
+      built: true, awaitingHumanApproval: true, iterations: i, testPath: spec.testPath, runId: RUN,
+      commitSha: review.commitSha, digest: review.digest, routes: review.routes, viewports: review.viewports,
+      notified: review.notified, notifyDetail: review.notifyDetail,
+    }
+  }
+
   last = `score ${v.score}/${lockedPassThreshold}, critical failures ${v.criticalFailures}: ${v.reason || v.evidence || 'checks failed'} · lint ${v.noNewEslintWarnings ? 'unchanged' : 'regressed'} · evidence ${v.evidence || 'none cited'}`
 }
 

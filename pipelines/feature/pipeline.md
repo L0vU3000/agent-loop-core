@@ -64,6 +64,31 @@ red-first step guards against tests that vacuously pass; the global gates guard 
   `workflow.js`.
 - Failures / surprises → [`../../memory/errors.md`](../../memory/errors.md).
 
+## UI review gate (opt-in)
+
+A ticket that touches UI/UX can opt in with `uiReview: true` in its inbox frontmatter (default
+false — every other ticket is unaffected). When set, the pipeline runs one extra stage
+**after Eval passes**, never before: it captures screenshots/artifacts per route and viewport,
+records the exact `git rev-parse HEAD`, and submits the packet with
+`node agent-loop/orchestrator/review-gate.mjs --submit --run <id> --commit <sha> --artifact <path> [...] --route <route> [...] --viewport <viewport> [...]`.
+It also attempts to notify the configured Telegram chat via whatever Hermes messaging tool is
+available — if none is available, it must say so rather than claim delivery.
+
+A submitted packet is **not** a finished run: the workflow returns
+`{ built: true, awaitingHumanApproval: true, commitSha, digest, ... }`, not the unconditional
+`DONE`. A human reviews the artifacts and decides locally — **there is no automated Telegram
+reply parser in v1**, so a Telegram message alone never decides anything:
+
+```
+node agent-loop/orchestrator/review-gate.mjs --approve --run <id> --commit <sha> --digest <digest>
+node agent-loop/orchestrator/review-gate.mjs --reject  --run <id> --commit <sha> --digest <digest> --feedback "..."
+node agent-loop/orchestrator/review-gate.mjs --status  --run <id>
+```
+
+`--commit`/`--digest` must match the pending packet exactly (see `orchestrator/review-gate.mjs`) —
+stale or mismatched evidence is refused. A rejection requires `--feedback`; a fresh submission
+(e.g. after a follow-up commit) is the only way back into review.
+
 ## Delegation status
 
 `execute` may run as a **team** per [`../DELEGATION.md`](../DELEGATION.md). The team layer is in
