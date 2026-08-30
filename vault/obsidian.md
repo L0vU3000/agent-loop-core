@@ -2,7 +2,7 @@
 type: architecture
 status: active
 created: 2026-07-21
-updated: 2026-07-21
+updated: 2026-07-30
 tags:
   - agent-loop
   - map
@@ -22,7 +22,8 @@ No community plugin is required.
 
 ## Start here
 
-- Installing a copy: [[vault/operations/installing-in-a-project]]
+- Installing the supported runtime: [[vault/operations/installing-in-a-project]]
+- Running one productized transaction: [[vault/operations/running-productized-transaction]]
 - System shape: [[vault/architecture/system-overview]]
 - Routing work: [[vault/concepts/work-items-and-routing]]
 - Pipeline lifecycle: [[vault/architecture/pipeline-lifecycle]]

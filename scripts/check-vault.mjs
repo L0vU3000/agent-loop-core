@@ -69,6 +69,7 @@ const REQUIRED_VAULT_PATHS = [
   'vault/concepts/evaluation-and-exit-conditions.md',
   'vault/concepts/memory-and-evidence.md',
   'vault/operations/installing-in-a-project.md',
+  'vault/operations/running-productized-transaction.md',
   'vault/operations/running-the-orchestrator.md',
   'vault/operations/creating-work-items.md',
   'vault/operations/reviewing-and-recording-runs.md',
