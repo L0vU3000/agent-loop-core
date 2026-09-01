@@ -31,6 +31,11 @@
 //                                                        # pipeline is re-verified here (fast
 //                                                        # objective gates); add --skip-gate to
 //                                                        # bypass for a quick manual record.
+//   node agent-loop/orchestrator/dispatch.mjs --candidates <category>
+//                                                        # dynamic intake/triage seam: list the
+//                                                        # pipelines registered under a valid
+//                                                        # category. Read-only — never dispatches,
+//                                                        # claims, or touches inbox state.
 
 import { existsSync, readFileSync, readdirSync, renameSync, mkdirSync, appendFileSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -179,6 +184,66 @@ export function recordOutcome(agentLoopRoot, file, outcome, summary = '') {
   }
 
   return { moved: `inbox/${archiveName}/${file}` }
+}
+
+// --- Category candidates: a read-only seam for dynamic intake/triage --------------------------
+// A dynamic, evidence-driven intake/triage stage may narrow a request to a valid `category`
+// before it can name an exact `type` (see categories.md "Routing metadata"). This function is
+// the ONLY thing that stage may call: it asks the same registry planDispatch() reads for the
+// pipelines registered under that category, and returns nothing more. It never reads or touches
+// inbox/*, never claims, never dispatches, never mutates state — it is a pure lookup against the
+// canonical registry, so its answer cannot drift from what planDispatch() will actually route.
+// The deterministic dispatcher remains the only component that turns a checked category+type
+// pair into a claim and a running pipeline; this function only ever narrows candidates for a
+// human or agent to choose from, and does not choose one itself.
+export function candidatePipelinesForCategory(agentLoopRoot, category) {
+  const registry = validatePipelineRegistry(agentLoopRoot)
+
+  // Same refusal as planDispatch(): a broken registry cannot yield a trustworthy candidate list,
+  // so fail closed with no candidates rather than answer from a partial or inconsistent registry.
+  if (!registry.ok) {
+    return {
+      ok: false,
+      category,
+      candidates: [],
+      reason: 'the pipeline registry is broken — refusing to answer from an inconsistent registry',
+      registryErrors: registry.errors,
+    }
+  }
+
+  const byCategory = new Map()
+  for (const definition of registry.definitions) {
+    if (!byCategory.has(definition.category)) {
+      byCategory.set(definition.category, [])
+    }
+    byCategory.get(definition.category).push(definition)
+  }
+
+  if (!byCategory.has(category)) {
+    const known = [...byCategory.keys()].sort().join(', ')
+    return {
+      ok: false,
+      category,
+      candidates: [],
+      reason: `unknown category "${category}" — valid categories are: ${known}`,
+    }
+  }
+
+  // Sorted by type for a deterministic, reproducible answer. Priority is a per-item property set
+  // when an item is filed, not a property of a pipeline, so it has no bearing on this ordering —
+  // this list is "priority-safe" precisely because it carries no priority to get wrong.
+  const candidates = byCategory.get(category)
+    .map((definition) => ({ type: definition.type, pipeline: definition.name }))
+    .sort((a, b) => a.type.localeCompare(b.type))
+
+  return {
+    ok: true,
+    category,
+    candidates,
+    note: 'Candidate pipelines only, not a decision — choosing one still requires human/agent '
+      + 'judgment and a testable "Done" line (see check-work-item.mjs) before a typed item is '
+      + 'filed in inbox/. This lookup never dispatches, claims, or mutates inbox state.',
+  }
 }
 
 // --- Item claim: mark an item in-progress atomically at dispatch time ------------------------
@@ -345,6 +410,38 @@ function runCli() {
       process.stdout.write(`reclaimed: moved to ${result.moved}\n`)
     } catch (error) {
       process.stderr.write(`reclaim failed: ${error.message}\n`)
+      process.exitCode = 1
+    }
+    return
+  }
+
+  // Dynamic intake/triage seam: given only a valid category, list the registered pipeline
+  // choices. Read-only — it never claims, dispatches, or touches inbox state.
+  const candidatesIndex = args.indexOf('--candidates')
+  if (candidatesIndex !== -1) {
+    const category = args[candidatesIndex + 1]
+    if (!category) {
+      process.stderr.write('usage: --candidates <category>\n')
+      process.exitCode = 1
+      return
+    }
+    const result = candidatePipelinesForCategory(root, category)
+    if (args.includes('--json')) {
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+      if (!result.ok) {
+        process.exitCode = 1
+      }
+    } else if (result.ok) {
+      process.stdout.write(`candidate pipelines for category "${category}":\n`)
+      for (const candidate of result.candidates) {
+        process.stdout.write(`  type=${candidate.type}  ->  ${candidate.pipeline}\n`)
+      }
+      process.stdout.write(`\n${result.note}\n`)
+    } else {
+      process.stderr.write(`${result.reason}\n`)
+      for (const error of result.registryErrors ?? []) {
+        process.stderr.write(`FAIL  registry: ${error}\n`)
+      }
       process.exitCode = 1
     }
     return

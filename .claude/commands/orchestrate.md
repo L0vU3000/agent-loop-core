@@ -20,9 +20,18 @@ Interpret the argument after `/orchestrate` as follows:
 
 ## Request intake
 
-1. Map the request to one pipeline type from `categories.md`. If it spans multiple types, split it.
-   Ask only the smallest number of questions needed to choose one type and write a verifiable done
-   condition.
+1. First identify the likely category from `categories.md`. If the exact type is clear, choose it.
+   If the request is ambiguous within that category, use the read-only candidate lookup before
+   deciding; it is a narrowing aid, not a dispatcher:
+
+   ```bash
+   node agent-loop/orchestrator/dispatch.mjs --candidates <category> --json
+   ```
+
+   Choose one returned type using the request evidence; if the request spans multiple types, split
+   it. Ask only the smallest number of questions needed to choose one type and write a verifiable
+   done condition. Do not file a category-only item: deterministic dispatch still requires both
+   `category` and `type`.
 2. Draft outside the live inbox at `.context/inbox-drafts/YYYY-MM-DD-<slug>.md`:
 
    ```markdown
@@ -81,8 +90,13 @@ dispatched.
 
 ## Guardrails
 
+- Dynamic intake/triage may narrow candidates; it never dispatches. The complete control flow is:
+  dynamic intake/triage → typed checked item → deterministic dispatch → isolated
+  explore/plan/execute/eval → commit-bound objective gates → independent verification → outcome.
 - One bounded item maps to one pipeline.
 - The router routes; the isolated workflow does the work.
+- Model choice belongs to the host/orchestrator that runs each stage; agent-loop-core does not
+  hard-code model providers or tiers.
 - Never use production data or destructive commands unless the project-specific `STACK.md` and an
   explicit user approval permit it.
 - Keep project knowledge notes in `agent-loop/vault/project/`; only routable work items belong in

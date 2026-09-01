@@ -16,6 +16,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import {
+  candidatePipelinesForCategory,
   claimItem,
   itemCategory,
   planDispatch,
@@ -212,6 +213,52 @@ test('claiming an item hides it from the next dispatch; a stale claim is reclaim
       assert.throws(() => claimItem(fixtureRoot, evil), /plain filename/, `claim must reject ${evil}`)
       assert.throws(() => reclaimItem(fixtureRoot, evil), /plain filename/, `reclaim must reject ${evil}`)
     }
+  } finally {
+    rmSync(fixtureRoot, { force: true, recursive: true })
+  }
+})
+
+test('category candidate lookup narrows to registered pipelines for a valid category, rejects an unknown one, and never touches inbox state', () => {
+  const fixtureRoot = mkdtempSync(join(operatingSystemTemporaryDirectory(), 'dispatch-candidates-'))
+
+  try {
+    copyRegistryFixture(fixtureRoot)
+    const inbox = join(fixtureRoot, 'orchestrator', 'inbox')
+    mkdirSync(inbox, { recursive: true })
+    // A pending item sits in the inbox throughout — the candidate lookup must leave it untouched.
+    writeItem(inbox, '10-lint-normal.md', { category: 'maintenance', type: 'lint', priority: 'normal', created: '2026-07-19' })
+    const inboxBefore = readdirSync(inbox).sort()
+
+    // Valid category: every registered type for "building" comes back, sorted, with no priority
+    // field anywhere in the answer (priority is a per-item property, not a pipeline property).
+    const building = candidatePipelinesForCategory(fixtureRoot, 'building')
+    assert.equal(building.ok, true)
+    assert.equal(building.category, 'building')
+    const buildingTypes = building.candidates.map((candidate) => candidate.type)
+    assert.deepEqual(buildingTypes, [...buildingTypes].sort(), 'candidates must be deterministically sorted by type')
+    assert.ok(buildingTypes.includes('bug'), 'building category must list the bug-fix pipeline')
+    assert.ok(buildingTypes.includes('feature'), 'building category must list the feature pipeline')
+    assert.ok(
+      building.candidates.every((candidate) => !('priority' in candidate)),
+      'candidates must carry no priority — this lookup is priority-safe by construction',
+    )
+    assert.match(building.note, /still requires human\/agent/i)
+    assert.match(building.note, /never dispatches, claims, or mutates inbox state/)
+
+    // Unknown category: rejected, never guessed, with the known set named for correction.
+    const bogus = candidatePipelinesForCategory(fixtureRoot, 'bogus-category')
+    assert.equal(bogus.ok, false)
+    assert.deepEqual(bogus.candidates, [])
+    assert.match(bogus.reason, /unknown category "bogus-category"/)
+    assert.match(bogus.reason, /building/)
+
+    // The lookup is read-only: it must never dispatch, claim, or mutate inbox state.
+    assert.deepEqual(readdirSync(inbox).sort(), inboxBefore, 'candidate lookup must not touch inbox state')
+    const planAfter = planDispatch(fixtureRoot)
+    assert.ok(
+      planAfter.routable.some((item) => item.file === '10-lint-normal.md'),
+      'the pending item must still be routable — the candidate lookup must not claim or dispatch it',
+    )
   } finally {
     rmSync(fixtureRoot, { force: true, recursive: true })
   }
