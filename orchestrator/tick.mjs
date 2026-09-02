@@ -13,7 +13,7 @@
 // the agent runs this tick, does the printed Workflow calls, then records each outcome.
 
 import { execFileSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -51,6 +51,17 @@ function refreshImprovementDigest() {
   }
 }
 
+// Graph edges proposed by `--record ... --next`. They are inert by design (the router cannot see
+// inbox/next/), which is exactly why the tick has to name them — an unsurfaced hand-off is the
+// same as no hand-off.
+function pendingEdgeDrafts() {
+  const directory = join(AGENT_LOOP_ROOT, 'orchestrator', 'inbox', 'next')
+  if (!existsSync(directory)) {
+    return []
+  }
+  return readdirSync(directory).filter((entry) => entry.endsWith('.md')).sort()
+}
+
 const plan = planDispatch(AGENT_LOOP_ROOT)
 
 if (!plan.registryOk) {
@@ -73,6 +84,14 @@ if (!plan.registryOk) {
     process.stdout.write(`  INVALID  ${item.file} — ${item.reason} (return for correction)\n`)
   }
 
+  const drafts = pendingEdgeDrafts()
+  if (drafts.length > 0) {
+    process.stdout.write(`\nPROPOSED EDGES (${drafts.length} draft${drafts.length === 1 ? '' : 's'} in inbox/next/ — inert until armed):\n`)
+    for (const draft of drafts) {
+      process.stdout.write(`  • ${draft} — write its own exit condition, check-work-item it, then move it into orchestrator/inbox/\n`)
+    }
+  }
+
   if (plan.routable.length === 0) {
     process.stdout.write('tick: idle — nothing to dispatch.\n')
   } else {
@@ -87,6 +106,7 @@ if (!plan.registryOk) {
       process.stdout.write(`  2. record against the LIVE tree — a record made inside the run's worktree is abandoned with that branch:\n`)
       process.stdout.write(`       FAIL -> from the live workspace: node agent-control-plane/orchestrator/dispatch.mjs --record ${item.file} fail --summary "<one line>"\n`)
       process.stdout.write(`       PASS -> land the worktree's change onto the live branch first, then --record ${item.file} pass from the live tree (the doorway re-runs the gates in your cwd, so they must see the landed change)\n`)
+      process.stdout.write(`  3. if this run's result implies another pipeline's work, add --next <type> to the PASS to draft that successor (inert until a human writes its exit condition); otherwise the item just closes\n`)
     }
     process.stdout.write(
       '\nBounds: honor each pipeline.md max-iterations / max-time; isolate per worktree; '

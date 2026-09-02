@@ -29,4 +29,8 @@ Choose category and type from [[categories]] and [[pipelines/README]]. State obs
 constraints, and risky approvals. Never include credentials or customer data. Validate a drafted
 item with `node agent-control-plane/orchestrator/check-work-item.mjs <path>` before dispatch.
 
+A `type: feature` ticket that touches UI/UX can add `uiReview: true` to opt into the human UI/UX
+approval gate — the pipeline then submits a screenshot packet for human sign-off after Eval
+passes instead of finishing unattended. See the feature pipeline's "UI review gate" section.
+
 See [[vault/concepts/work-items-and-routing]] for why the router rejects ambiguity.

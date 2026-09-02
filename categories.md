@@ -54,7 +54,11 @@ explore → plan → execute → eval
 
 An eval failure returns to `plan` so the next attempt incorporates the verifier's evidence.
 The maker and verifier remain separate agents. Plan also defines the task-specific 100-point
-rubric using [`pipelines/EVAL.md`](./pipelines/EVAL.md). Eval passes only when the score reaches
+rubric using [`pipelines/EVAL.md`](./pipelines/EVAL.md). A pipeline whose plan splits into genuinely
+independent sub-tasks may run `execute` as a **team** — a lead that delegates to workers and
+desk-checks each returned piece before assembling — per
+[`pipelines/DELEGATION.md`](./pipelines/DELEGATION.md). That is an opt-in inside one node; it does
+not change the pipeline's category, contract, or its single hand-off to the orchestrator. Eval passes only when the score reaches
 the planned threshold and every critical criterion passes.
 
 ## Testing inside building pipelines

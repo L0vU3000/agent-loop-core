@@ -28,6 +28,27 @@ const TICKET = (args || '').replace(/\s*--provider=\S+/, '').trim()
   || '(no ticket path passed — read the newest agent-control-plane/orchestrator/inbox/*.md with type: research)'
 const MAX = 3
 
+// --- Delegation (see ../DELEGATION.md) -------------------------------------------------------
+// Execute runs as a LEAD: split the question into independent sub-questions, hand each to a
+// WORKER, desk-check what comes back, then SYNTHESIZE one report. Read-only, so unlike a writing
+// team there are no file collisions to guard — sub-questions overlap harmlessly. The caps are the
+// same, and for the same reason: over-spawning is how this pattern runs up a bill.
+const MAX_WORKERS = 4
+const MAX_REWORK = 1
+
+const SPLIT = { type: 'object', required: ['questions'],
+  properties: {
+    questions: { type: 'array', items: { type: 'object', required: ['question', 'sources'],
+      properties: { question: { type: 'string' }, sources: { type: 'string' } } } },
+    reason: { type: 'string' },
+  } }
+
+const DESK = { type: 'object', required: ['accepted'],
+  properties: {
+    accepted: { type: 'boolean' },
+    reason: { type: 'string' },
+  } }
+
 const FRAME = { type: 'object', required: ['accepted', 'runId'],
   properties: {
     accepted: { type: 'boolean' },
@@ -122,18 +143,91 @@ while (i < MAX) {
     return { researched: false, rubricChangeNeedsApproval: true, iterations: i, runId: RUN }
   }
 
-  await agent(
-    `You are the EXECUTE stage (MAKER). Follow ${P}/execute.md. Write only into
-     \`${P}/runs/${RUN}/\`. Run the research with the deep-research skill and /investigate, then
-     write the complete cited report (report.md) and its sources list (sources.md). Read every
-     source before you cite it; bind every material claim to a source that actually says it; move
-     anything the sources do not support into the Uncertainty section. Do NOT edit product source,
-     schema, or the live orchestrator inbox. If the plan cannot answer the question without
-     inventing sources, stop and report — don't manufacture evidence.`,
-    { label: `execute#${i}`, phase: 'Research loop', ...TIER.make })
+  // EXECUTE — the lead decides whether the question splits into independent sub-questions.
+  const split = await agent(
+    `You are the LEAD of the execute stage. Follow ${P}/execute.md and ../DELEGATION.md.
+     Read \`${P}/runs/${RUN}/plan.md\` and split the question into INDEPENDENT sub-questions —
+     independent means each can be researched without another's answer. Return at most
+     ${MAX_WORKERS}, each with the source types that would settle it. Return ZERO OR ONE when the
+     question is a single line of enquiry or each step depends on the last answer: the solo path is
+     the default and is not a failure. Do not manufacture sub-questions to look thorough.`,
+    { label: `split#${i}`, phase: 'Research loop', schema: SPLIT, ...TIER.read })
+
+  // The cap is applied HERE, in code — whatever the lead proposed, at most MAX_WORKERS run.
+  const questions = (split.questions || []).slice(0, MAX_WORKERS)
+  if ((split.questions || []).length > MAX_WORKERS) {
+    log(`lead proposed ${split.questions.length} sub-questions; capped to ${MAX_WORKERS}`)
+  }
+
+  let unanswered = []
+  if (questions.length <= 1) {
+    log(`iter ${i}: solo path — ${split.reason || 'one line of enquiry'}`)
+    await agent(
+      `You are the EXECUTE stage (MAKER, working solo). Follow ${P}/execute.md. Write only into
+       \`${P}/runs/${RUN}/\`. Run the research with the deep-research skill and /investigate, then
+       write the complete cited report (report.md) and its sources list (sources.md). Read every
+       source before you cite it; bind every material claim to a source that actually says it; move
+       anything the sources do not support into the Uncertainty section. Do NOT edit product source,
+       schema, or the live orchestrator inbox. If the plan cannot answer the question without
+       inventing sources, stop and report — don't manufacture evidence.`,
+      { label: `execute#${i}`, phase: 'Research loop', ...TIER.make })
+  } else {
+    log(`iter ${i}: delegating ${questions.length} sub-question(s)`)
+    const reviewed = await pipeline(
+      questions,
+      (item, _original, n) => agent(
+        `You are a WORKER on the research team. Follow ${P}/execute.md. Research EXACTLY this one
+         sub-question and nothing else: ${item.question} (likely sources: ${item.sources})
+         Write your findings to \`${P}/runs/${RUN}/notes-${n + 1}.md\` — notes and sources only, not
+         the report; the lead writes that. Read every source before you cite it and bind every claim
+         to a source that actually says it. Do NOT edit product source, schema, or the live
+         orchestrator inbox. Do NOT delegate any part of this to another agent — you are the one
+         doing the work. If the sources do not answer it, say so; never manufacture evidence.`,
+        { label: `worker#${i}.${n + 1}`, phase: 'Research loop', ...TIER.make }),
+
+      async (_notes, item, n) => {
+        // DESK CHECK — a different agent than the worker. Cheap early filter on fabricated or
+        // unsupported sourcing, so Eval's adversarial fact-check starts from a cleaner draft.
+        let note = ''
+        for (let attempt = 0; attempt <= MAX_REWORK; attempt++) {
+          const desk = await agent(
+            `You are the LEAD desk-checking a worker's notes before they enter the report.
+             Sub-question: ${item.question}
+             Read \`${P}/runs/${RUN}/notes-${n + 1}.md\`. Accept only if every source resolves, each
+             cited source actually supports the claim attached to it, and the notes answer the
+             sub-question asked rather than an easier neighbour. Reject with a specific, actionable
+             reason otherwise. You are reviewing, not researching — do not fill the gaps yourself.`,
+            { label: `desk#${i}.${n + 1}${attempt ? `r${attempt}` : ''}`, phase: 'Research loop', schema: DESK, ...TIER.verify })
+          if (desk.accepted) return { item, accepted: true }
+          note = desk.reason || 'rejected without a reason'
+          if (attempt === MAX_REWORK) break
+          await agent(
+            `You are the WORKER. Your notes were rejected at desk check: ${note}
+             Fix exactly that for: ${item.question}. Re-read the sources, do not widen the
+             sub-question, do not delegate, never manufacture evidence.`,
+            { label: `rework#${i}.${n + 1}`, phase: 'Research loop', ...TIER.make })
+        }
+        return { item, accepted: false, reason: note }
+      })
+
+    unanswered = reviewed.filter(Boolean).filter((r) => !r.accepted)
+    log(`iter ${i}: ${questions.length - unanswered.length}/${questions.length} sub-question(s) accepted at desk check`)
+
+    // SYNTHESIS — a research team's product is one report, not a pile of notes. Unlike a build,
+    // the workers' output is not the deliverable, so the lead assembles it.
+    await agent(
+      `You are the LEAD, synthesizing the team's accepted notes into the report. Follow
+       ${P}/execute.md. Write only into \`${P}/runs/${RUN}/\`: the complete cited report (report.md)
+       and its sources list (sources.md). Build it from \`notes-*.md\`, carrying each claim's source
+       through — do not re-assert anything the notes do not carry.
+       ${unanswered.length ? `These sub-questions did NOT pass desk check and must appear in the Uncertainty section as open, not smoothed over: ${unanswered.map((r) => r.item.question).join('; ')}.` : ''}
+       Move anything the sources do not support into Uncertainty. Never manufacture evidence.`,
+      { label: `synthesize#${i}`, phase: 'Research loop', ...TIER.make })
+  }
 
   const v = await agent(
     `You are the EVAL stage (VERIFIER — a DIFFERENT agent from the maker). Follow ${P}/eval.md.
+     ${unanswered.length ? `The lead reports ${unanswered.length} sub-question(s) NOT accepted at desk check: ${unanswered.map((r) => r.item.question).join('; ')}. A desk check is not your verdict — fact-check the whole report yourself, and treat any of these presented as settled rather than open as a critical failure.` : ''}
      Write your verdict to \`${P}/runs/${RUN}/eval.md\`. Adversarially fact-check the report: fetch
      every source yourself (a dead or invented source is a critical failure), open each citation and
      confirm the source actually supports the claim it is attached to, sweep for any unsupported

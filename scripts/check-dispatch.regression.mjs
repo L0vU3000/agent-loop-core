@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdtempSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
@@ -19,11 +20,15 @@ import {
   candidatePipelinesForCategory,
   claimItem,
   itemCategory,
+  MAX_GRAPH_DEPTH,
   planDispatch,
+  proposeNext,
   reclaimItem,
   recordOutcome,
   STALE_CLAIM_MS,
 } from '../orchestrator/dispatch.mjs'
+import { checkWorkItem } from '../orchestrator/check-work-item.mjs'
+import { validatePipelineRegistry } from './check-pipeline-registry.mjs'
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url))
 const SOURCE_ROOT = resolve(SCRIPT_DIRECTORY, '..')
@@ -259,6 +264,82 @@ test('category candidate lookup narrows to registered pipelines for a valid cate
       planAfter.routable.some((item) => item.file === '10-lint-normal.md'),
       'the pending item must still be routable — the candidate lookup must not claim or dispatch it',
     )
+  } finally {
+    rmSync(fixtureRoot, { force: true, recursive: true })
+  }
+})
+
+test('a graph edge proposes an inert successor draft: unroutable, un-armable, provenance-carrying, depth-capped', () => {
+  const fixtureRoot = mkdtempSync(join(operatingSystemTemporaryDirectory(), 'dispatch-edge-'))
+
+  try {
+    copyRegistryFixture(fixtureRoot)
+    const inbox = join(fixtureRoot, 'orchestrator', 'inbox')
+    mkdirSync(inbox, { recursive: true })
+
+    // A planning item that passes and hands off to a building pipeline — the canonical edge
+    // (research answers the question; the change it implies is a separate node's job).
+    writeItem(inbox, '10-research.md', { category: 'planning', type: 'research', priority: 'high', created: '2026-08-12' })
+    recordOutcome(fixtureRoot, '10-research.md', 'pass', 'report ready')
+
+    const edge = proposeNext(fixtureRoot, '10-research.md', ['feature'], { summary: 'report ready', today: '2026-08-12' })
+    assert.deepEqual(edge.written, ['inbox/next/10-research--feature.md'])
+    assert.equal(edge.depth, 1)
+
+    const draftPath = join(inbox, 'next', '10-research--feature.md')
+    const draft = readFileSync(draftPath, 'utf8')
+
+    // (1) INERT: the draft must be invisible to the router — inbox/next/ is not the inbox.
+    const plan = planDispatch(fixtureRoot)
+    assert.equal(plan.routable.length, 0, 'a proposed edge must not be routable')
+    assert.equal(plan.invalid.length, 0, 'a proposed edge must not even appear as an invalid item')
+
+    // (2) UN-ARMABLE: dropped into the inbox as-is, the checker must still reject it for having no
+    // exit condition. This is the guard against inheriting the predecessor's "Done" line and
+    // shipping work nobody verified.
+    const registry = validatePipelineRegistry(fixtureRoot)
+    const byType = new Map(registry.definitions.map((definition) => [definition.type, definition]))
+    const verdict = checkWorkItem(draft, byType)
+    assert.equal(verdict.ok, false, 'an unedited edge draft must not pass the work-item checker')
+    assert.ok(
+      verdict.problems.some((problem) => /done/i.test(problem)),
+      `rejection must be about the missing exit condition, got: ${verdict.problems.join(' | ')}`,
+    )
+
+    // (3) PROVENANCE + correct routing metadata: the edge resolves the successor's category from
+    // the registry (never copies the predecessor's), and records where it came from.
+    assert.match(draft, /^category: building$/m)
+    assert.match(draft, /^type: feature$/m)
+    assert.match(draft, /^from: 10-research\.md$/m)
+    assert.match(draft, /^depth: 1$/m)
+    assert.match(draft, /inbox\/done\/10-research\.md/, 'state travels by reference to the upstream item')
+
+    // (4) NOT CLOBBERED: re-proposing leaves an edited draft alone.
+    writeFileSync(draftPath, 'hand-edited\n')
+    const again = proposeNext(fixtureRoot, '10-research.md', ['feature'], { today: '2026-08-12' })
+    assert.deepEqual(again.written, [])
+    assert.deepEqual(again.skipped, ['inbox/next/10-research--feature.md'])
+    assert.equal(readFileSync(draftPath, 'utf8'), 'hand-edited\n')
+
+    // (5) DEPTH CAP: a chain at the cap must refuse another hop rather than cycle forever.
+    writeItem(inbox, '20-deep.md', {
+      category: 'planning', type: 'research', priority: 'normal', created: '2026-08-12', depth: MAX_GRAPH_DEPTH,
+    })
+    recordOutcome(fixtureRoot, '20-deep.md', 'pass', 'deep')
+    assert.throws(
+      () => proposeNext(fixtureRoot, '20-deep.md', ['feature']),
+      /exceeds the cap/,
+      'the graph must be bounded — a hop past the cap needs a human, not another node',
+    )
+
+    // (6) An unregistered successor type is a hard error, not a silently written draft.
+    assert.throws(() => proposeNext(fixtureRoot, '10-research.md', ['banana']), /no pipeline registered/)
+    assert.throws(() => proposeNext(fixtureRoot, '10-research.md', []), /at least one/)
+
+    // The shared traversal guard covers this rename/write path too.
+    for (const evil of ['../escape.md', 'sub/dir.md', '..', '']) {
+      assert.throws(() => proposeNext(fixtureRoot, evil, ['feature']), /plain filename/, `propose must reject ${evil}`)
+    }
   } finally {
     rmSync(fixtureRoot, { force: true, recursive: true })
   }

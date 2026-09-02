@@ -36,14 +36,32 @@
 //                                                        # pipelines registered under a valid
 //                                                        # category. Read-only — never dispatches,
 //                                                        # claims, or touches inbox state.
+//                                                        # A claimed PASS on an item whose
+//                                                        # frontmatter sets uiReview: true is
+//                                                        # additionally refused unless
+//                                                        # --review-run <id> --review-commit <sha>
+//                                                        # --review-digest <digest> cite an
+//                                                        # APPROVED review-gate.mjs record whose
+//                                                        # commit + digest match exactly AND this
+//                                                        # repository's current HEAD still equals
+//                                                        # that commit. --skip-gate does NOT bypass
+//                                                        # this — it only bypasses the objective
+//                                                        # machinery+tsc gate above.
+//   node agent-control-plane/orchestrator/dispatch.mjs --record <file> pass --next <type>[,<type>]
+//                                                        # draw the graph EDGE: propose successor
+//                                                        # work item(s) under inbox/next/. Drafts
+//                                                        # only — nothing routes until a human
+//                                                        # writes the successor's exit condition
+//                                                        # and moves the file into inbox/.
 
-import { existsSync, readFileSync, readdirSync, renameSync, mkdirSync, appendFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, renameSync, mkdirSync, appendFileSync, statSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { validatePipelineRegistry } from '../scripts/check-pipeline-registry.mjs'
 import { collectMetrics } from './metrics.mjs'
+import { getReview } from './review-gate.mjs'
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url))
 const DEFAULT_AGENT_LOOP_ROOT = resolve(SCRIPT_DIRECTORY, '..')
@@ -246,6 +264,107 @@ export function candidatePipelinesForCategory(agentLoopRoot, category) {
   }
 }
 
+// --- Graph edges: propose a successor after a PASS -------------------------------------------
+// The loop layer was already done: one pipeline = one node = explore→plan→execute→eval with its
+// own separate verifier. What had no representation anywhere was the layer above — an EDGE. A
+// research report that concludes "build X" used to die in done/ until a human retyped it as a new
+// ticket, so the hand-off existed only in someone's head. --next writes it down.
+//
+// Three properties keep an edge from quietly becoming an autonomous chain:
+//   - a draft lands in inbox/next/, which planDispatch CANNOT see (inboxItemFiles lists top-level
+//     *.md only), so it is inert until a human moves it into inbox/ — the same invariant that
+//     already hides done/, failed/, and in-progress/;
+//   - the draft deliberately carries NO "Done =" line, so check-work-item.mjs REJECTS it until
+//     someone writes the successor's own exit condition. A predecessor's exit condition must never
+//     be inherited — the next node has a different job, and a stale Done line is how a graph ships
+//     work nobody verified;
+//   - depth is capped, so research→spec→research cannot cycle forever ("set a spend cap and a
+//     hard bound" — a graph is many loops, and a weak verifier now burns tokens in parallel).
+//
+// State travels along the edge by REFERENCE, not by copy: the draft points at the predecessor's
+// archived file rather than inlining it. Keeps the successor's context lean (Horthy's dumb zone)
+// and keeps one source of truth for what the upstream node actually said.
+export const MAX_GRAPH_DEPTH = 4
+
+export function proposeNext(agentLoopRoot, file, types, { summary = '', today = new Date().toISOString().slice(0, 10) } = {}) {
+  assertPlainInboxFilename(file)
+  if (!Array.isArray(types) || types.length === 0) {
+    throw new Error('--next needs at least one registered pipeline type')
+  }
+
+  const registry = validatePipelineRegistry(agentLoopRoot)
+  if (!registry.ok) {
+    throw new Error(`refusing to propose an edge — the pipeline registry is broken: ${registry.errors[0]}`)
+  }
+  const byType = new Map(registry.definitions.map((definition) => [definition.type, definition]))
+
+  const inboxDirectory = join(agentLoopRoot, 'orchestrator', 'inbox')
+  // Called right after recordOutcome, so the predecessor already sits in done/. Fall back to the
+  // top-level inbox for a caller that proposes before recording.
+  const archived = join(inboxDirectory, 'done', file)
+  const source = existsSync(archived) ? archived : join(inboxDirectory, file)
+  if (!existsSync(source)) {
+    throw new Error(`predecessor item not found: ${file}`)
+  }
+  const predecessor = parseItemFrontmatter(readFileSync(source, 'utf8')) || {}
+
+  const depth = Number(predecessor.depth || 0) + 1
+  if (!Number.isFinite(depth) || depth > MAX_GRAPH_DEPTH) {
+    throw new Error(`graph depth ${depth} exceeds the cap of ${MAX_GRAPH_DEPTH} — restate the goal as a fresh item instead of adding another hop`)
+  }
+
+  const nextDirectory = join(inboxDirectory, 'next')
+  mkdirSync(nextDirectory, { recursive: true })
+
+  const written = []
+  const skipped = []
+  for (const type of types) {
+    const pipeline = byType.get(type)
+    if (!pipeline) {
+      throw new Error(`no pipeline registered for type "${type}"`)
+    }
+    const name = `${file.replace(/\.md$/, '')}--${type}.md`
+    const target = join(nextDirectory, name)
+    // Never clobber a draft someone has already started editing.
+    if (existsSync(target)) {
+      skipped.push(`inbox/next/${name}`)
+      continue
+    }
+    writeFileSync(target, draftSuccessor({ pipeline, type, predecessorFile: file, predecessor, depth, summary, today }))
+    written.push(`inbox/next/${name}`)
+  }
+  return { written, skipped, depth }
+}
+
+// Deliberately has no "Done =" line — see the note above. check-work-item.mjs is the arming gate.
+function draftSuccessor({ pipeline, type, predecessorFile, predecessor, depth, summary, today }) {
+  return `---
+category: ${pipeline.category}
+type: ${type}
+priority: ${predecessor.priority || 'normal'}
+created: ${today}
+from: ${predecessorFile}
+depth: ${depth}
+---
+
+Proposed successor: \`${predecessorFile}\` passed and hands off to the **${pipeline.name}** pipeline.
+
+- Upstream outcome: ${summary || '(no summary recorded)'}
+- Upstream item: \`orchestrator/inbox/done/${predecessorFile}\` — read it for the original objective,
+  and its pipeline's \`runs/<run-id>/\` folder for the evidence this hand-off rests on.
+
+TODO before this can route: replace this paragraph with the exit condition for THIS node — one
+line a fresh verifier could check without you. The upstream exit condition is not inherited; this
+node has a different job. Then move the file into \`orchestrator/inbox/\` and validate it with
+\`node agent-control-plane/orchestrator/check-work-item.mjs\`.
+
+## Do NOT
+
+- inherit the upstream scope wholesale — restate what this node must produce.
+- widen the work because the upstream run found something adjacent; that is a separate item.
+`
+}
+
 // --- Item claim: mark an item in-progress atomically at dispatch time ------------------------
 // orchestrator.md step 2c requires the router to "mark it in-progress" between selecting an item
 // and recording its outcome. Without that, two concurrent ticks re-read the same top-level inbox
@@ -323,6 +442,21 @@ export function itemCategory(agentLoopRoot, file) {
   return frontmatter?.category ?? null
 }
 
+// Whether an item opted into the human UI/UX approval gate (see review-gate.mjs and
+// pipelines/feature/workflow.js's Specify stage, which threads `uiReview: true` through from
+// the ticket's frontmatter). Same claimed-first, top-level-second resolution as itemCategory —
+// this is read at record time, when the item may already have been claimed into in-progress/.
+// A missing file or frontmatter is "no" rather than an error: the record gate should never be
+// the thing an operator has to fight to record an item that dispatch would already reject.
+export function itemRequiresUiReview(agentLoopRoot, file) {
+  const inboxDirectory = join(agentLoopRoot, 'orchestrator', 'inbox')
+  const claimedSource = join(inboxDirectory, 'in-progress', file)
+  const source = existsSync(claimedSource) ? claimedSource : join(inboxDirectory, file)
+  if (!existsSync(source)) return false
+  const frontmatter = parseItemFrontmatter(readFileSync(source, 'utf8'))
+  return frontmatter?.uiReview === 'true'
+}
+
 // Run one objective check. A non-zero EXIT (error.status is a number) means it ran and failed —
 // a real signal. A spawn error (no status, e.g. ENOENT) means it could not run — not a failure.
 function runCheck(command, commandArgs, cwd) {
@@ -363,6 +497,92 @@ export function decideRecord({ claimed, gate, skipGate }) {
   }
   if (gate.passed) return { outcome: 'pass', note: '' }
   return { outcome: 'fail', note: `verdict overruled by record gate: ${gate.detail}` }
+}
+
+// The UI review acceptance boundary: a claimed pass on a `uiReview: true` item is refused unless
+// the durable review-gate record for the cited run is `approved` AND the cited commit + digest
+// are the EXACT ones on that approved record AND the consuming repository's current HEAD is
+// still that commit (a later commit invalidates an otherwise-valid approval — it approved a
+// screenshot of a build that no longer exists). Read-only: never mutates the review-gate state,
+// only judges evidence already submitted/decided through review-gate.mjs.
+export function checkUiReviewApproval(agentLoopRoot, { runId, commitSha, digest, currentHead } = {}) {
+  if (!runId || !commitSha || !digest || !currentHead) {
+    return { ok: false, reason: 'UI review evidence missing: runId, commitSha, digest, and the current HEAD are all required' }
+  }
+
+  const record = getReview(agentLoopRoot, runId)
+  if (!record) {
+    return { ok: false, reason: `no review submission found for run "${runId}"` }
+  }
+
+  if (record.status !== 'approved') {
+    return { ok: false, reason: `UI review for run "${runId}" is not approved (status: ${record.status})` }
+  }
+
+  const normalizedCommitSha = commitSha.toLowerCase()
+  if (record.commitSha !== normalizedCommitSha || record.digest !== digest) {
+    return {
+      ok: false,
+      reason: `UI review evidence for run "${runId}" does not match the approved record `
+        + `(approved commit ${record.commitSha}, digest ${record.digest})`,
+    }
+  }
+
+  const normalizedHead = currentHead.toLowerCase()
+  if (normalizedHead !== record.commitSha) {
+    return {
+      ok: false,
+      reason: `current HEAD ${normalizedHead} does not match the approved commit ${record.commitSha} for run "${runId}"`,
+    }
+  }
+
+  return { ok: true, reason: '' }
+}
+
+// The real record doorway: recordOutcome plus everything that must happen BEFORE a claimed
+// outcome is trusted enough to move. Order matters — the UI review gate is checked first and is
+// NEVER subject to --skip-gate (that flag only bypasses the objective machinery+tsc gate below),
+// so a UI-gated item can never slip through on "quick manual record".
+export function recordClaimedOutcome(agentLoopRoot, file, outcome, options = {}) {
+  const {
+    summary = '',
+    skipGate = false,
+    reviewRunId = '',
+    reviewCommitSha = '',
+    reviewDigest = '',
+    currentHead = '',
+  } = options
+
+  if (outcome === 'pass' && itemRequiresUiReview(agentLoopRoot, file)) {
+    const approval = checkUiReviewApproval(agentLoopRoot, {
+      runId: reviewRunId, commitSha: reviewCommitSha, digest: reviewDigest, currentHead,
+    })
+    if (!approval.ok) {
+      throw new Error(`UI review gate refused: ${approval.reason}`)
+    }
+  }
+
+  const category = outcome === 'pass' && !skipGate ? itemCategory(agentLoopRoot, file) : null
+  const gate = category && isGateBearing(category) ? runFastGates(agentLoopRoot) : null
+  const decision = decideRecord({ claimed: outcome, gate, skipGate })
+  const finalSummary = decision.note
+    ? (summary ? `${decision.note} | claimed: ${summary}` : decision.note)
+    : summary
+
+  const result = recordOutcome(agentLoopRoot, file, decision.outcome, finalSummary)
+  return { decision, gate, finalSummary, moved: result.moved }
+}
+
+// The consuming repository's current commit, used to check a UI review approval has not gone
+// stale (see checkUiReviewApproval). Best-effort like runFastGates' checks: an environment where
+// git cannot be run yields '' rather than throwing, so checkUiReviewApproval's own evidence-missing
+// path is what refuses the record, with a clear reason instead of a raw spawn error.
+function currentGitHead(agentLoopRoot) {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: resolve(agentLoopRoot, '..') }).toString().trim()
+  } catch {
+    return ''
+  }
 }
 
 function cliRoot() {
@@ -454,17 +674,39 @@ function runCli() {
     const summaryIndex = args.indexOf('--summary')
     const summary = summaryIndex !== -1 ? args[summaryIndex + 1] : ''
     if (!file || !outcome) {
-      process.stderr.write('usage: --record <file> <pass|fail> [--summary "..."] [--skip-gate]\n')
+      process.stderr.write(
+        'usage: --record <file> <pass|fail> [--summary "..."] [--skip-gate]\n'
+        + '       [--review-run <id> --review-commit <sha> --review-digest <digest>] [--next <type>[,<type>]]\n',
+      )
       process.exitCode = 1
       return
     }
 
     // Re-verify a claimed PASS before trusting it. Only code-changing pipelines have objective
-    // gates; read-only ones are recorded as-is. --skip-gate bypasses for a quick manual record.
+    // gates; read-only ones are recorded as-is. --skip-gate bypasses for a quick manual record —
+    // but never bypasses the UI review gate below (recordClaimedOutcome enforces that ordering).
     const skipGate = args.includes('--skip-gate')
-    const category = outcome === 'pass' && !skipGate ? itemCategory(root, file) : null
-    const gate = category && isGateBearing(category) ? runFastGates(root) : null
-    const decision = decideRecord({ claimed: outcome, gate, skipGate })
+    const reviewRunIndex = args.indexOf('--review-run')
+    const reviewCommitIndex = args.indexOf('--review-commit')
+    const reviewDigestIndex = args.indexOf('--review-digest')
+
+    let outcomeResult
+    try {
+      outcomeResult = recordClaimedOutcome(root, file, outcome, {
+        summary,
+        skipGate,
+        reviewRunId: reviewRunIndex !== -1 ? args[reviewRunIndex + 1] : '',
+        reviewCommitSha: reviewCommitIndex !== -1 ? args[reviewCommitIndex + 1] : '',
+        reviewDigest: reviewDigestIndex !== -1 ? args[reviewDigestIndex + 1] : '',
+        currentHead: currentGitHead(root),
+      })
+    } catch (error) {
+      process.stderr.write(`record refused: ${error.message}\n`)
+      process.exitCode = 1
+      return
+    }
+
+    const { decision, gate, finalSummary, moved } = outcomeResult
     if (decision.outcome !== outcome) {
       process.stderr.write(`record gate: claimed ${outcome} but ${gate.detail} — recording ${decision.outcome}\n`)
     } else if (gate && gate.checked) {
@@ -472,12 +714,8 @@ function runCli() {
     } else if (outcome === 'pass' && !skipGate) {
       process.stdout.write(`record gate: skipped (${gate ? gate.detail : 'read-only pipeline'})\n`)
     }
-    const finalSummary = decision.note
-      ? (summary ? `${decision.note} | claimed: ${summary}` : decision.note)
-      : summary
 
-    const result = recordOutcome(root, file, decision.outcome, finalSummary)
-    process.stdout.write(`recorded ${decision.outcome}: moved to ${result.moved}\n`)
+    process.stdout.write(`recorded ${decision.outcome}: moved to ${moved}\n`)
     // Harvest the runtime's cost/quality telemetry for any finished run into the ledger. A
     // hiccup here must never block the record itself — the outcome is already saved.
     try {
@@ -487,6 +725,29 @@ function runCli() {
       }
     } catch (error) {
       process.stderr.write(`metrics harvest skipped: ${error.message}\n`)
+    }
+
+    // Graph edge. Proposed off the DECIDED outcome, not the claimed one — an edge must never be
+    // drawn out of a pass the record gate just overruled. Never blocks the record: the outcome is
+    // already saved, and a failed hand-off is a note to a human, not a lost run.
+    const nextIndex = args.indexOf('--next')
+    if (nextIndex !== -1) {
+      const types = (args[nextIndex + 1] || '').split(',').map((type) => type.trim()).filter(Boolean)
+      if (decision.outcome !== 'pass') {
+        process.stderr.write('--next ignored: an edge is only drawn from a recorded pass\n')
+      } else {
+        try {
+          const edge = proposeNext(root, file, types, { summary: finalSummary })
+          for (const draft of edge.written) {
+            process.stdout.write(`edge: proposed ${draft} (depth ${edge.depth}) — write its exit condition, then move it into orchestrator/inbox/\n`)
+          }
+          for (const draft of edge.skipped) {
+            process.stdout.write(`edge: ${draft} already exists — left untouched\n`)
+          }
+        } catch (error) {
+          process.stderr.write(`edge not proposed: ${error.message}\n`)
+        }
+      }
     }
     return
   }

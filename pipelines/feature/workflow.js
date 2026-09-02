@@ -27,12 +27,60 @@ const TICKET = (args || '').replace(/\s*--provider=\S+/, '').trim()
   || '(no ticket path passed — read the newest agent-control-plane/orchestrator/inbox/*.md with type: feature)'
 const MAX = 6
 
+// --- Delegation (see ../DELEGATION.md) -------------------------------------------------------
+// Execute runs as a LEAD: split the approved plan, hand each independent sub-task to a WORKER,
+// DESK-CHECK what comes back, assemble, report up. Eval is untouched — the team still hands the
+// router exactly one verified result.
+//
+// Both numbers are enforced in code below, never merely asked for in the prompt. Over-spawning is
+// the documented way this pattern fails (a plausible plan proposes 40 workers where 3 would do),
+// and a cap a model is politely asked to respect is not a cap.
+const MAX_WORKERS = 4
+const MAX_REWORK = 1
+
+const SPLIT = { type: 'object', required: ['tasks'],
+  properties: {
+    tasks: { type: 'array', items: { type: 'object', required: ['title', 'scope', 'files'],
+      properties: {
+        title: { type: 'string' },
+        scope: { type: 'string' },
+        files: { type: 'array', items: { type: 'string' } }, // the exact paths this worker may write
+      } } },
+    reason: { type: 'string' },
+  } }
+
+// Workers run CONCURRENTLY in ONE shared worktree — this is a writing pipeline, so two workers
+// touching the same file clobber each other, and a prompt asking them to stay in scope is not a
+// lock. A split is therefore only safe when the declared file sets are disjoint, and that is
+// checked here in code for the same reason the worker cap is: the lead's word is not a guarantee.
+// Overlap, or a task that declares no files at all, collapses the whole split to the solo path —
+// slower than a good split, but it cannot produce a half-clobbered build.
+function fileDisjoint(tasks) {
+  const claimed = new Set()
+  for (const task of tasks) {
+    const files = (task.files || []).map((file) => file.trim()).filter(Boolean)
+    if (files.length === 0) return false
+    for (const file of files) {
+      if (claimed.has(file)) return false
+      claimed.add(file)
+    }
+  }
+  return true
+}
+
+const DESK = { type: 'object', required: ['accepted'],
+  properties: {
+    accepted: { type: 'boolean' },
+    reason: { type: 'string' },
+  } }
+
 const SPEC = { type: 'object', required: ['specified', 'runId'],
   properties: {
     specified: { type: 'boolean' },
     runId: { type: 'string' },
     testPath: { type: 'string' },
     criteria: { type: 'string' },
+    uiReview: { type: 'boolean' },
     note: { type: 'string' },
   } }
 
@@ -60,6 +108,22 @@ const VERDICT = { type: 'object', required: ['verdict', 'score', 'passThreshold'
     reason: { type: 'string' },
   } }
 
+// Opt-in human UI/UX approval gate (see ../../orchestrator/review-gate.md). Runs only after
+// Eval passes, and only when the ticket set `uiReview: true`. The agent itself submits the
+// packet and attempts the Telegram notification — this workflow has no filesystem/process
+// access of its own, so it can only orchestrate and read back what the agent reports.
+const REVIEW = { type: 'object', required: ['submitted', 'commitSha', 'digest', 'notified'],
+  properties: {
+    submitted: { type: 'boolean' },
+    commitSha: { type: 'string' },
+    digest: { type: 'string' },
+    routes: { type: 'array', items: { type: 'string' } },
+    viewports: { type: 'array', items: { type: 'string' } },
+    notified: { type: 'boolean' },
+    notifyDetail: { type: 'string' },
+    reason: { type: 'string' },
+  } }
+
 phase('Specify')
 const spec = await agent(
   `You are the EXPLORE stage of the feature pipeline. Follow ${P}/explore.md.
@@ -68,9 +132,12 @@ const spec = await agent(
    \`mkdir -p ${P}/runs/<run-id>\` — every later stage writes ONLY into that folder.
    Use \`graphify query\` to orient before reading code. Extract the ticket's acceptance
    criteria and write FAILING acceptance test(s) that encode them (confirm they are red for
-   the right reason — the feature is missing). Return specified, runId, testPath, and a
-   one-line criteria summary. If the criteria are ambiguous, set specified=false and explain
-   in note — do not invent product behavior.`,
+   the right reason — the feature is missing). Also read the ticket's frontmatter for
+   \`uiReview: true\` (see ../../orchestrator/orchestrator.md's inbox contract) — a
+   UI-affecting feature opts into a human UI/UX approval gate that runs after Eval passes.
+   Return specified, runId, testPath, uiReview (default false if the ticket does not set
+   it), and a one-line criteria summary. If the criteria are ambiguous, set specified=false
+   and explain in note — do not invent product behavior.`,
   { label: 'explore', schema: SPEC, ...TIER.read })
 
 if (!spec.specified) {
@@ -112,15 +179,93 @@ while (i < MAX) {
     return { built: false, rubricChangeNeedsApproval: true, iterations: i, runId: RUN }
   }
 
-  await agent(
-    `You are the EXECUTE stage (MAKER). Follow ${P}/execute.md. Write only into
-     \`${P}/runs/${RUN}/\`. Build exactly what the plan describes. Do NOT modify the
-     acceptance tests to make them pass. If the plan is wrong, stop and report — don't
-     improvise.`,
-    { label: `execute#${i}`, phase: 'Build loop', ...TIER.make })
+  // EXECUTE — the lead first decides whether this plan is even a team's worth of work.
+  const split = await agent(
+    `You are the LEAD of the execute stage. Follow ${P}/execute.md and ../DELEGATION.md.
+     Read \`${P}/runs/${RUN}/plan.md\` and split it into INDEPENDENT sub-tasks — independent means
+     they touch different files and neither needs the other's output. Return at most ${MAX_WORKERS}.
+     For EACH sub-task, list in \`files\` the exact paths that worker will write. Those lists must
+     not overlap: workers run at the same time in the same tree, so two of them on one file
+     overwrite each other. If you cannot split the plan into file-disjoint pieces, return a single
+     task (or none) and say why in \`reason\`.
+     Return ZERO OR ONE task when the plan is one engineer's work or its steps must happen in
+     order: the solo path is the default and is not a failure. Do not invent parallelism to look
+     busy — a split that removes no wall-clock or context pressure is worse than no split.`,
+    { label: `split#${i}`, phase: 'Build loop', schema: SPLIT, ...TIER.read })
+
+  // The cap is applied HERE, in code. Whatever the lead proposed, at most MAX_WORKERS run.
+  const tasks = (split.tasks || []).slice(0, MAX_WORKERS)
+  if ((split.tasks || []).length > MAX_WORKERS) {
+    log(`lead proposed ${split.tasks.length} sub-tasks; capped to ${MAX_WORKERS}`)
+  }
+
+  const safeToSplit = tasks.length > 1 && fileDisjoint(tasks)
+  if (tasks.length > 1 && !safeToSplit) {
+    log(`iter ${i}: split rejected — sub-tasks overlap on files (or declared none); falling back to solo`)
+  }
+
+  let incomplete = []
+  if (!safeToSplit) {
+    log(`iter ${i}: solo path — ${split.reason || 'plan is one engineer\'s work'}`)
+    await agent(
+      `You are the EXECUTE stage (MAKER, working solo). Follow ${P}/execute.md. Write only into
+       \`${P}/runs/${RUN}/\`. Build exactly what the plan describes. Do NOT modify the
+       acceptance tests to make them pass. If the plan is wrong, stop and report — don't
+       improvise.`,
+      { label: `execute#${i}`, phase: 'Build loop', ...TIER.make })
+  } else {
+    log(`iter ${i}: delegating ${tasks.length} sub-task(s)`)
+    // pipeline(), not parallel(): each sub-task desk-checks the moment its worker finishes,
+    // instead of every reviewer waiting on the slowest build.
+    const reviewed = await pipeline(
+      tasks,
+      (task, _original, n) => agent(
+        `You are a WORKER on the feature team. Follow ${P}/execute.md. Write only into
+         \`${P}/runs/${RUN}/\`. Build EXACTLY this one sub-task and nothing else:
+         ${task.title} — ${task.scope}
+         Stay inside that scope; another worker owns the rest of the plan and you will collide with
+         them if you widen. Do NOT modify the acceptance tests. Do NOT delegate any part of this to
+         another agent — you are the one doing the work. If this sub-task cannot be built as
+         described, stop and report why rather than improvising a different design.`,
+        { label: `worker#${i}.${n + 1}`, phase: 'Build loop', ...TIER.make }),
+
+      async (_built, task, n) => {
+        // DESK CHECK — a different agent than the worker (TIER.verify vs TIER.make). Cheap early
+        // filter, not a replacement for Eval.
+        let note = ''
+        for (let attempt = 0; attempt <= MAX_REWORK; attempt++) {
+          const desk = await agent(
+            `You are the LEAD desk-checking a worker's sub-task before accepting it into the build.
+             Sub-task: ${task.title} — ${task.scope}
+             Read what changed under \`${P}/runs/${RUN}/\` and in the working tree. Accept only if
+             the sub-task is actually built as scoped, stays inside its scope, and did not modify
+             the acceptance tests. Reject with a specific, actionable reason otherwise. You are
+             reviewing, not building — do not fix it yourself.`,
+            { label: `desk#${i}.${n + 1}${attempt ? `r${attempt}` : ''}`, phase: 'Build loop', schema: DESK, ...TIER.verify })
+          if (desk.accepted) return { task, accepted: true }
+          note = desk.reason || 'rejected without a reason'
+          if (attempt === MAX_REWORK) break
+          await agent(
+            `You are the WORKER. Your sub-task was rejected at desk check: ${note}
+             Fix exactly that, inside the same scope: ${task.title} — ${task.scope}. Do not widen,
+             do not touch the acceptance tests, do not delegate.`,
+            { label: `rework#${i}.${n + 1}`, phase: 'Build loop', ...TIER.make })
+        }
+        // Bounded: still rejected after its rework, so it is reported up as incomplete rather
+        // than looped on. Eval will see the gap; hiding it would only delay the same verdict.
+        return { task, accepted: false, reason: note }
+      })
+
+    incomplete = reviewed.filter(Boolean).filter((r) => !r.accepted)
+    log(`iter ${i}: ${tasks.length - incomplete.length}/${tasks.length} sub-task(s) accepted at desk check`)
+    if (incomplete.length > 0) {
+      log(`iter ${i}: incomplete — ${incomplete.map((r) => `${r.task.title}: ${r.reason}`).join(' · ')}`)
+    }
+  }
 
   const v = await agent(
     `You are the EVAL stage (VERIFIER — a DIFFERENT agent from the maker). Follow ${P}/eval.md.
+     ${incomplete.length ? `The lead reports ${incomplete.length} sub-task(s) NOT accepted at desk check: ${incomplete.map((r) => `${r.task.title} (${r.reason})`).join('; ')}. Verify the build on its merits regardless — a desk check is not your verdict.` : ''}
      Write your verdict to \`${P}/runs/${RUN}/eval.md\`. Run the acceptance tests at
      ${spec.testPath} (must go green, unmodified), \`npx vitest run\` (whole suite green),
      \`npx tsc --noEmit\` (0 errors), and \`${LINT}\` (no new warnings). Return the verdict
@@ -136,10 +281,51 @@ while (i < MAX) {
     return { built: false, rubricChangeNeedsApproval: true, iterations: i, runId: RUN }
   }
 
-  if (v.verdict === 'pass' && v.rubricValid && v.rubricSha256 === lockedRubricSha256 && v.passThreshold === lockedPassThreshold && v.score >= lockedPassThreshold && v.criticalFailures === 0 && v.acceptancePasses && v.suiteGreen && v.tscErrors === 0 && v.noNewEslintWarnings) {
+  const evalPassed = v.verdict === 'pass' && v.rubricValid && v.rubricSha256 === lockedRubricSha256 && v.passThreshold === lockedPassThreshold && v.score >= lockedPassThreshold && v.criticalFailures === 0 && v.acceptancePasses && v.suiteGreen && v.tscErrors === 0 && v.noNewEslintWarnings
+
+  if (evalPassed && !spec.uiReview) {
     log(`DONE: feature built and guarded by ${spec.testPath}`)
     return { built: true, iterations: i, testPath: spec.testPath, runId: RUN }
   }
+
+  if (evalPassed && spec.uiReview) {
+    const review = await agent(
+      `You are the UI-REVIEW stage — a human UI/UX approval gate for a feature that opted in via
+       \`uiReview: true\`. Eval has already passed at iteration ${i}; your job is to package
+       evidence for a human reviewer and submit it, not to re-judge the build.
+       1. Capture screenshots or other visual artifacts of the affected routes at the relevant
+          viewports (at least one mobile and one desktop viewport) and save them under
+          \`${P}/runs/${RUN}/screenshots/\`.
+       2. Record the exact current commit with \`git rev-parse HEAD\` — this is the commit the
+          human is approving, so it must be precise.
+       3. Submit the packet with:
+          \`node orchestrator/review-gate.mjs --submit --run ${RUN} --commit <sha> --artifact <path> [...] --route <route> [...] --viewport <viewport> [...]\`
+          and read back the digest it prints.
+       4. Send the captured screenshot files as media/image attachments to the configured
+          Telegram chat, alongside the commit and digest, using whatever Hermes messaging tool is
+          available to you — a pointer to where the files live is not enough, the human reviewer
+          needs the images themselves in the chat. If no Hermes messaging tool capable of media
+          attachments is available to you, do NOT claim the screenshots were delivered or sent —
+          report that media messaging tooling was unavailable and return notified=false with a
+          reason instead of guessing.
+       Return submitted, commitSha (the exact 40-char SHA), digest (from review-gate.mjs's
+       output), routes, viewports, notified, and notifyDetail (what happened when you tried to
+       notify, or why you could not).`,
+      { label: `ui-review#${i}`, phase: 'Build loop', schema: REVIEW, ...TIER.verify })
+
+    if (!review.submitted) {
+      log(`STOP: UI review packet could not be submitted — ${review.reason || 'see ui-review notes'}`)
+      return { built: false, uiReviewRequired: true, uiReviewSubmitted: false, iterations: i, runId: RUN, reason: review.reason }
+    }
+
+    log(`AWAITING HUMAN APPROVAL: UI review packet submitted for commit ${review.commitSha} (digest ${review.digest})${review.notified ? '' : ' — Telegram notify not confirmed'}`)
+    return {
+      built: true, awaitingHumanApproval: true, iterations: i, testPath: spec.testPath, runId: RUN,
+      commitSha: review.commitSha, digest: review.digest, routes: review.routes, viewports: review.viewports,
+      notified: review.notified, notifyDetail: review.notifyDetail,
+    }
+  }
+
   last = `score ${v.score}/${lockedPassThreshold}, critical failures ${v.criticalFailures}: ${v.reason || v.evidence || 'checks failed'} · lint ${v.noNewEslintWarnings ? 'unchanged' : 'regressed'} · evidence ${v.evidence || 'none cited'}`
 }
 

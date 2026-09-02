@@ -29,6 +29,27 @@ const TICKET = (args || '').replace(/\s*--provider=\S+/, '').trim()
   || '(no ticket path passed — read the newest agent-control-plane/orchestrator/inbox/*.md with type: code-review)'
 const MAX = 3
 
+// --- Delegation (see ../DELEGATION.md) -------------------------------------------------------
+// Execute runs as a LEAD: split the review into independent LENSES (correctness, security,
+// performance, ...) or areas, hand each to a WORKER, desk-check what comes back, then merge one
+// findings report. Read-only, so there is nothing for concurrent workers to clobber; the caps are
+// the same, because over-spawning is how this pattern runs up a bill.
+const MAX_WORKERS = 4
+const MAX_REWORK = 1
+
+const SPLIT = { type: 'object', required: ['lenses'],
+  properties: {
+    lenses: { type: 'array', items: { type: 'object', required: ['lens', 'scope'],
+      properties: { lens: { type: 'string' }, scope: { type: 'string' } } } },
+    reason: { type: 'string' },
+  } }
+
+const DESK = { type: 'object', required: ['accepted'],
+  properties: {
+    accepted: { type: 'boolean' },
+    reason: { type: 'string' },
+  } }
+
 const FRAME = { type: 'object', required: ['accepted', 'runId'],
   properties: {
     accepted: { type: 'boolean' },
@@ -125,19 +146,96 @@ while (i < MAX) {
     return { reviewed: false, rubricChangeNeedsApproval: true, iterations: i, runId: RUN }
   }
 
-  await agent(
-    `You are the EXECUTE stage (MAKER). Follow ${P}/execute.md. Write only into
-     \`${P}/runs/${RUN}/\`. Review only the in-scope files/hunks with the /code-review and /review
-     skills, then write the findings report (findings.md) — each finding severity · location
-     (file:line) · cited evidence · why it matters, most-severe first — and the drafted fix tickets
-     (proposed-tickets.md, \`approved: false\`) for each confirmed high-severity finding. Ground
-     every finding in real code with a reproducible trigger; a false positive is worse than a miss —
-     report zero findings if the change is clean. Do NOT edit product source, schema, or the live
-     orchestrator inbox. If the plan's scope is wrong, stop and report — don't invent findings.`,
-    { label: `execute#${i}`, phase: 'Review loop', ...TIER.make })
+  // EXECUTE — the lead decides whether this review is worth more than one pair of eyes.
+  const split = await agent(
+    `You are the LEAD of the execute stage. Follow ${P}/execute.md and ../DELEGATION.md.
+     Read \`${P}/runs/${RUN}/plan.md\` and split the review into INDEPENDENT lenses or areas —
+     independent means each can be reviewed without another's findings. Distinct lenses
+     (correctness, security, performance, data integrity) beat N reviewers repeating one pass:
+     redundancy finds the same bug four times, diversity finds four bugs. Return at most
+     ${MAX_WORKERS}. Return ZERO OR ONE when the change is small or one lens covers it — the solo
+     path is the default and is not a failure. Do not split a two-file diff four ways.`,
+    { label: `split#${i}`, phase: 'Review loop', schema: SPLIT, ...TIER.read })
+
+  // The cap is applied HERE, in code — whatever the lead proposed, at most MAX_WORKERS run.
+  const lenses = (split.lenses || []).slice(0, MAX_WORKERS)
+  if ((split.lenses || []).length > MAX_WORKERS) {
+    log(`lead proposed ${split.lenses.length} lenses; capped to ${MAX_WORKERS}`)
+  }
+
+  let unreviewed = []
+  if (lenses.length <= 1) {
+    log(`iter ${i}: solo path — ${split.reason || 'one reviewer covers this change'}`)
+    await agent(
+      `You are the EXECUTE stage (MAKER, working solo). Follow ${P}/execute.md. Write only into
+       \`${P}/runs/${RUN}/\`. Review only the in-scope files/hunks with the /code-review and /review
+       skills, then write the findings report (findings.md) — each finding severity · location
+       (file:line) · cited evidence · why it matters, most-severe first — and the drafted fix tickets
+       (proposed-tickets.md, \`approved: false\`) for each confirmed high-severity finding. Ground
+       every finding in real code with a reproducible trigger; a false positive is worse than a miss —
+       report zero findings if the change is clean. Do NOT edit product source, schema, or the live
+       orchestrator inbox. If the plan's scope is wrong, stop and report — don't invent findings.`,
+      { label: `execute#${i}`, phase: 'Review loop', ...TIER.make })
+  } else {
+    log(`iter ${i}: delegating ${lenses.length} lens(es)`)
+    const reviewed = await pipeline(
+      lenses,
+      (item, _original, n) => agent(
+        `You are a WORKER on the review team. Follow ${P}/execute.md. Review the in-scope change
+         through EXACTLY this one lens and nothing else: ${item.lens} — ${item.scope}
+         Write your findings to \`${P}/runs/${RUN}/findings-${n + 1}.md\` — severity · location
+         (file:line) · cited evidence · why it matters. Another worker owns the other lenses; do not
+         duplicate their ground. Ground every finding in real code with a reproducible trigger; a
+         false positive is worse than a miss — report zero findings if this lens is clean. Do NOT
+         edit product source, schema, or the live orchestrator inbox. Do NOT delegate any part of
+         this to another agent — you are the one doing the work.`,
+        { label: `worker#${i}.${n + 1}`, phase: 'Review loop', ...TIER.make }),
+
+      async (_found, item, n) => {
+        // DESK CHECK — a different agent than the worker. Kills the obvious false positives before
+        // Eval's adversarial re-verification, which is the expensive pass.
+        let note = ''
+        for (let attempt = 0; attempt <= MAX_REWORK; attempt++) {
+          const desk = await agent(
+            `You are the LEAD desk-checking a worker's findings before they enter the report.
+             Lens: ${item.lens} — ${item.scope}
+             Read \`${P}/runs/${RUN}/findings-${n + 1}.md\`. For each finding, re-read the cited
+             file:line and confirm the code actually says what the finding claims. Reject the set if
+             any finding misquotes the code, cannot be triggered, or sits outside the declared scope
+             — name which one and why. An empty findings list is a valid, acceptable result. You are
+             reviewing, not reviewing the code yourself — do not add findings.`,
+            { label: `desk#${i}.${n + 1}${attempt ? `r${attempt}` : ''}`, phase: 'Review loop', schema: DESK, ...TIER.verify })
+          if (desk.accepted) return { item, accepted: true }
+          note = desk.reason || 'rejected without a reason'
+          if (attempt === MAX_REWORK) break
+          await agent(
+            `You are the WORKER. Your findings were rejected at desk check: ${note}
+             Fix exactly that for the ${item.lens} lens: drop what you cannot reproduce, correct any
+             misquoted evidence. Do not widen the lens, do not delegate, do not pad the list.`,
+            { label: `rework#${i}.${n + 1}`, phase: 'Review loop', ...TIER.make })
+        }
+        return { item, accepted: false, reason: note }
+      })
+
+    unreviewed = reviewed.filter(Boolean).filter((r) => !r.accepted)
+    log(`iter ${i}: ${lenses.length - unreviewed.length}/${lenses.length} lens(es) accepted at desk check`)
+
+    // MERGE — the team's product is one findings report, not N per-lens files.
+    await agent(
+      `You are the LEAD, merging the team's accepted findings into one report. Follow
+       ${P}/execute.md. Write only into \`${P}/runs/${RUN}/\`: findings.md (most-severe first,
+       de-duplicated where two lenses found the same defect, each keeping its strongest cited
+       evidence) and proposed-tickets.md (\`approved: false\`) for each confirmed high-severity
+       finding. Carry findings through from \`findings-*.md\` — do not invent any that no worker
+       reported.
+       ${unreviewed.length ? `These lenses did NOT pass desk check and must be declared as not covered in the report's scope section: ${unreviewed.map((r) => r.item.lens).join('; ')}.` : ''}
+       Do NOT edit product source, schema, or the live orchestrator inbox.`,
+      { label: `merge#${i}`, phase: 'Review loop', ...TIER.make })
+  }
 
   const v = await agent(
     `You are the EVAL stage (VERIFIER — a DIFFERENT agent from the maker). Follow ${P}/eval.md.
+     ${unreviewed.length ? `The lead reports ${unreviewed.length} lens(es) NOT accepted at desk check: ${unreviewed.map((r) => r.item.lens).join('; ')}. A desk check is not your verdict — re-verify everything reported, and treat an uncovered lens presented as covered scope as a critical failure.` : ''}
      Write your verdict to \`${P}/runs/${RUN}/eval.md\`. Adversarially re-verify EVERY reported
      finding: independently reproduce it or re-read the cited file:line with \`graphify\` and file
      reads to confirm the code actually says what the finding claims. DROP any finding you cannot

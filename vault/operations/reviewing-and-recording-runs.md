@@ -18,6 +18,27 @@ Land an accepted code change before recording it from the live tree. Then use th
 command printed by the tick. A code-changing pass is rechecked at the record doorway and may be
 downgraded; a fail is never upgraded. Record abandoned failures from the live workspace.
 
+A `feature` run with `awaitingHumanApproval: true` is not yet decided — Eval passed but the ticket
+opted into the UI review gate. Review the submitted screenshots/artifacts, then decide locally
+with the exact commit + digest the run reported (there is no automated Telegram reply parser in
+v1, so a Telegram message alone never decides anything):
+
+```
+node agent-control-plane/orchestrator/review-gate.mjs --approve --run <id> --commit <sha> --digest <digest>
+node agent-control-plane/orchestrator/review-gate.mjs --reject  --run <id> --commit <sha> --digest <digest> --feedback "..."
+```
+
+Approval alone does not record the item. Cite that exact approved run/commit/digest at the record
+doorway:
+
+```
+node agent-control-plane/orchestrator/dispatch.mjs --record <file> pass --review-run <id> --review-commit <sha> --review-digest <digest>
+```
+
+The record doorway refuses a `uiReview: true` item — `--skip-gate` included — unless a
+`review-gate.mjs` record for that run is `approved` with this exact commit + digest, and this
+repository's current HEAD still equals that commit.
+
 Run folders and archives are instance state. Do not promote or hand-edit them. Consult
 [[orchestrator/orchestrator|the canonical recording contract]] and
 [[vault/concepts/evaluation-and-exit-conditions]].

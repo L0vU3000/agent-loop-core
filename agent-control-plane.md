@@ -50,6 +50,13 @@ Karpathy's point: the leverage is in *speeding up verification*, not writing lon
 > *code is the unsung hero* (fast, deterministic, zero-token) are the frame to keep. Build a solid
 > loop first, then wire loops into workflows as the work gets bigger.
 
+**Where the graph fits.** One pipeline is one node — a full loop with its own separate verifier.
+The layer above is the **edge**: whose output becomes whose input, and what state rides along it.
+That layer is deliberately small. Nodes are the work; edges are only hand-offs, and every one stops
+at a human who writes the successor's own exit condition — see
+[Edges](./orchestrator/orchestrator.md#edges--pipeline-hand-offs). Master the loop first: a graph
+of weak nodes is just a weak org.
+
 ---
 
 ## The five things that turn a chat into a loop

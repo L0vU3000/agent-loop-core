@@ -76,6 +76,19 @@ Interpret the argument after `/orchestrate` as follows:
    node agent-control-plane/orchestrator/dispatch.mjs --record <inbox-file> <pass|fail> --summary "<one line>"
    ```
 
+7. If a passing run's result is another pipeline's input — research that concludes a change is
+   needed, a review that finds a bug worth fixing — draw the edge instead of letting the hand-off
+   live only in the conversation. Append `--next <type>[,<type>]` to the `pass`:
+
+   ```bash
+   node agent-control-plane/orchestrator/dispatch.mjs --record <inbox-file> pass --summary "<one line>" --next <type>
+   ```
+
+   That drafts the successor under `orchestrator/inbox/next/`. It is inert: the router cannot see
+   it, and the checker rejects it until someone writes that node's **own** exit condition — never
+   the predecessor's. Arm it exactly like any other item (step 3, then move it into the inbox), and
+   only when the successor is actually wanted. Do not chain edges to keep the loop busy.
+
 ## Plan or existing inbox
 
 For `/orchestrate plan`, run:

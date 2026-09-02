@@ -46,10 +46,15 @@ function clearMarkdown(dir) {
   return removed
 }
 
+// Every queue directory, not just the ones that existed first. A stale claim or a proposed edge
+// carried into a fresh project is instance data pretending to be work — in-progress/ would wedge
+// an item nobody is running, next/ would offer a hand-off from a predecessor that no longer exists.
 let wiped = 0
 wiped += clearMarkdown(join(AGENT_LOOP_ROOT, 'orchestrator', 'inbox'))
 wiped += clearMarkdown(join(AGENT_LOOP_ROOT, 'orchestrator', 'inbox', 'done'))
 wiped += clearMarkdown(join(AGENT_LOOP_ROOT, 'orchestrator', 'inbox', 'failed'))
+wiped += clearMarkdown(join(AGENT_LOOP_ROOT, 'orchestrator', 'inbox', 'in-progress'))
+wiped += clearMarkdown(join(AGENT_LOOP_ROOT, 'orchestrator', 'inbox', 'next'))
 wiped += clearMarkdown(join(AGENT_LOOP_ROOT, 'orchestrator', 'done'))
 
 // Empty every pipeline's runs/ folder (keep .gitkeep).

@@ -19,6 +19,11 @@ and prints the pipeline workflow for the agent runtime. Recording then moves the
 appropriate archive and updates the ledger. A claimed pass on code-changing work passes through
 objective record gates that can downgrade a result but never upgrade one.
 
+A recorded pass may also draw an edge to the next pipeline, drafting a successor work item that
+carries provenance and depth forward. Edges are proposals, not dispatches: a draft is invisible to
+the router and deliberately lacks an exit condition, so a human must write the successor's own
+before it can route. Depth is capped, so hand-offs cannot chain indefinitely.
+
 The heartbeat is one scheduled pass, not an unbounded `while` loop. The agent executes the
 workflow named by the dispatcher and records the result against the live tree. This preserves a
 clear seam between deterministic routing and probabilistic work.

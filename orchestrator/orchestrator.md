@@ -114,6 +114,43 @@ select among pipelines within the supplied category; the current router requires
 
 ---
 
+## Edges — pipeline hand-offs
+
+A pipeline is one **node**: its own `explore → plan → execute → eval` loop with its own separate
+verifier. An **edge** is what happens when a node's output implies the next node's work — a
+research report that concludes "build X", a code-review that finds a bug worth fixing. Until now
+that hand-off existed only in someone's head: the item landed in `done/` and a human retyped it.
+
+`--record <file> pass --next <type>[,<type>]` writes the hand-off down as a **draft** under
+`inbox/next/`, carrying `from:` and `depth:` forward. Several types comma-separated is fan-out
+(one node proposing several successors); there is deliberately no fan-in — a join needs shared
+state that outlives a run, and nothing yet needs one.
+
+A draft is inert by construction, three ways:
+
+- **Unroutable.** `inbox/next/` is a subdirectory, and the router lists top-level `*.md` only —
+  the same invariant that already hides `done/`, `failed/`, and `in-progress/`.
+- **Un-armable.** The draft deliberately carries **no exit condition**, so
+  [`check-work-item.mjs`](./check-work-item.mjs) rejects it until a human writes one. A
+  predecessor's exit condition is never inherited: the next node has a different job, and a stale
+  `"Done" =` line is how a graph ships work nobody verified.
+- **Bounded.** `depth` is capped at `MAX_GRAPH_DEPTH` (4). A chain at the cap refuses another hop
+  and asks for a human to restate the goal. A graph is many loops; a weak verifier burns tokens in
+  parallel, so the chain gets a hard bound like every other run does.
+
+State travels along an edge **by reference** — the draft points at `inbox/done/<predecessor>` and
+its run folder rather than inlining them. One source of truth for what upstream said, and the
+successor's context stays lean.
+
+Each tick prints pending drafts under **PROPOSED EDGES**, because an unsurfaced hand-off is the
+same as no hand-off. Arming one is: write its exit condition → `check-work-item.mjs` → move it
+into `inbox/`.
+
+The edge is only drawn from the **decided** outcome, never the claimed one — a pass the record
+gate overruled proposes nothing.
+
+---
+
 ## Guardrails (non-negotiable)
 
 - **Isolation:** every dispatched pipeline runs in its **own git worktree** — never on the
@@ -134,6 +171,7 @@ that should never spend a model call.
 node agent-control-plane/orchestrator/dispatch.mjs            # print the dispatch plan (dry run)
 node agent-control-plane/orchestrator/dispatch.mjs --json     # same plan, machine-readable
 node agent-control-plane/orchestrator/dispatch.mjs --record <file> <pass|fail> [--summary "..."]
+node agent-control-plane/orchestrator/dispatch.mjs --record <file> pass --next <type>[,<type>]
 ```
 
 What it does each tick:

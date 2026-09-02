@@ -5,6 +5,23 @@ report and any drafted fix tickets under `runs/<run-id>/`. Do not edit product s
 migrations, seed data, or the live orchestrator inbox. The installed `/code-review` and `/review`
 skills are your reviewing engines.
 
+## Running as a team
+
+This stage runs as a **team** when the work splits, and solo when it doesn't. The shared rules are
+in [`../DELEGATION.md`](../DELEGATION.md).
+
+**As the LEAD:** split into independent lenses — independent means neither needs the other's
+output. **One, or none → solo path:** do the work yourself, per the rules below. That is the default
+and it is not a failure. Otherwise delegate one lens per worker, **desk-check** each returned
+piece before accepting it (does the evidence hold up? does it answer what was asked? is it inside
+scope?), then merge the accepted `findings-*.md` into `findings.md` + `proposed-tickets.md`. Reject with a specific, actionable reason — you review, you don't redo the
+work. A rejected lens gets **one** rework; still rejected, declare it openly in the report rather
+than papering over it. This pipeline is read-only, so workers cannot collide — but the worker cap
+and rework bound are still enforced by `workflow.js`, not by your judgment.
+
+**As a worker (or solo):** stay inside your lens; another worker owns the rest. **Never delegate** —
+there is no third level. Write into the one shared `runs/<run-id>/`; do not mint your own run-id.
+
 ## Review the change
 
 Review only the files and hunks the plan named as in scope. Use `graphify query`/`path` to orient

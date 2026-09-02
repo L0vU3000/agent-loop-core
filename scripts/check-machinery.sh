@@ -109,6 +109,16 @@ else
   bad "record gate is defined but not wired into --record"
 fi
 
+# Tripwire: the graph edge must actually be wired into --record, and must draw off the DECIDED
+# outcome — an edge drawn from a pass the record gate just overruled would propagate a bad node.
+if grep -q 'proposeNext' orchestrator/dispatch.mjs \
+  && grep -q -- "'--next'" orchestrator/dispatch.mjs \
+  && grep -q "decision.outcome !== 'pass'" orchestrator/dispatch.mjs; then
+  good "graph edge is wired into --record and drawn only from a decided pass"
+else
+  bad "graph edge is defined but not wired into --record (or not gated on the decided outcome)"
+fi
+
 # Tripwire: the item-claim lock must actually be wired into the CLI, not just defined — otherwise
 # two concurrent ticks can still re-dispatch the same inbox item between dispatch and record.
 if grep -q 'claimItem' orchestrator/dispatch.mjs && grep -q -- "'--claim'" orchestrator/dispatch.mjs; then
@@ -124,6 +134,23 @@ else
   bad "metrics collector regression check failed"
   node --test scripts/check-metrics.regression.mjs 2>&1 | sed 's/^/      /' || true
 fi
+
+# A delegating pipeline runs a team inside Execute. The caps that keep a team from becoming a
+# 50-agent bill must live in the workflow's own code, not in a prompt asking nicely.
+if node --test scripts/check-delegation.regression.mjs > /dev/null; then
+  good "delegation caps workers in code, desk-checks every sub-task, and bounds rework"
+else
+  bad "delegation regression check failed"
+  node --test scripts/check-delegation.regression.mjs 2>&1 | sed 's/^/      /' || true
+fi
+# Tripwire: a worker must never be able to spawn its own team — recursion is the 10x-cost failure.
+for delegating in $(grep -ls 'DELEGATION.md' pipelines/*/workflow.js 2>/dev/null); do
+  name=$(basename "$(dirname "$delegating")")
+  grep -q 'slice(0, MAX_WORKERS)' "$delegating" \
+    && grep -q 'Do NOT delegate' "$delegating" \
+    && good "$name: worker cap applied in code and workers forbidden from delegating" \
+    || bad "$name: delegation cap or no-recursion rule missing"
+done
 
 if node --test scripts/check-eval-scoring.regression.mjs > /dev/null; then
   good "task-specific Eval scoring contract is enforced across every pipeline"
