@@ -83,7 +83,7 @@ Every Eval failure writes evidence and returns to Plan before another Execute at
 - **No progress:** stop after the same verifier failure repeats twice or no eligible package remains.
 - **Human checkpoints:** approve every Plan; separately approve any future proposal to admit a major
   upgrade. Training mode cannot be disabled by a runtime flag.
-- **Memory:** append proven dependency landmines to `agent-loop/memory/errors.md`.
+- **Memory:** append proven dependency landmines to `agent-control-plane/memory/errors.md`.
 
 ## Status and trigger
 

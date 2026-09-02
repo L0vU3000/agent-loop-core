@@ -4,7 +4,7 @@ status: active
 created: 2026-07-21
 updated: 2026-07-21
 tags:
-  - agent-loop
+  - agent-control-plane
   - project-owned
 ---
 

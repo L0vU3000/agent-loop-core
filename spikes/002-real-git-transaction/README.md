@@ -2,7 +2,7 @@
 
 ## Question
 
-**Given** the canonical `agent-loop-core` dispatcher and the state contracts validated in Spike 001, **when** one disposable `bug-fix` item is executed against a real broken Git repository, **then** can the system atomically claim it, reproduce the defect, create a repair commit in an isolated maker worktree, verify that exact commit in a separate clean worktree, require objective gates, and record the canonical outcome with immutable evidence identities?
+**Given** the canonical `agent-control-plane` dispatcher and the state contracts validated in Spike 001, **when** one disposable `bug-fix` item is executed against a real broken Git repository, **then** can the system atomically claim it, reproduce the defect, create a repair commit in an isolated maker worktree, verify that exact commit in a separate clean worktree, require objective gates, and record the canonical outcome with immutable evidence identities?
 
 ## Verdict: PARTIAL
 

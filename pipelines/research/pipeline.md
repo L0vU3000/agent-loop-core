@@ -125,7 +125,7 @@ Eval is a different-model, read-only verifier.
   source to a claim the source does not support, or present a guess as a settled fact.
 - **Bounds:** maximum 3 report attempts and a small agent-call cap per invocation; stop after the
   same verifier failure repeats twice.
-- **Memory:** append failures and reusable lessons to `agent-loop/memory/errors.md`.
+- **Memory:** append failures and reusable lessons to `agent-control-plane/memory/errors.md`.
 
 ## Exit routing
 

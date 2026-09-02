@@ -3,7 +3,7 @@
 // Orchestrator heartbeat — ONE scheduled tick. This is the closing of the loop, as far as
 // built-in primitives allow. Trigger it on a cadence (never a raw while(true) — the ADR):
 //
-//   /loop 30m node agent-loop/orchestrator/tick.mjs
+//   /loop 30m node agent-control-plane/orchestrator/tick.mjs
 //   (or a /schedule cloud routine that runs the same command)
 //
 // A tick is: plan -> refresh the board -> [agent runs each workflow.js on the Workflow
@@ -80,12 +80,12 @@ if (!plan.registryOk) {
     for (const item of plan.routable) {
       process.stdout.write(`\n• ${item.file}  ->  ${item.pipeline}\n`)
       if (item.automated) {
-        process.stdout.write(`  1. Workflow({ scriptPath: "agent-loop/${item.workflow}" })   # explore→plan→execute→eval\n`)
+        process.stdout.write(`  1. Workflow({ scriptPath: "agent-control-plane/${item.workflow}" })   # explore→plan→execute→eval\n`)
       } else {
-        process.stdout.write(`  1. no workflow.js — run agent-loop/pipelines/${item.pipeline}/{explore,plan,execute,eval}.md by hand\n`)
+        process.stdout.write(`  1. no workflow.js — run agent-control-plane/pipelines/${item.pipeline}/{explore,plan,execute,eval}.md by hand\n`)
       }
       process.stdout.write(`  2. record against the LIVE tree — a record made inside the run's worktree is abandoned with that branch:\n`)
-      process.stdout.write(`       FAIL -> from the live workspace: node agent-loop/orchestrator/dispatch.mjs --record ${item.file} fail --summary "<one line>"\n`)
+      process.stdout.write(`       FAIL -> from the live workspace: node agent-control-plane/orchestrator/dispatch.mjs --record ${item.file} fail --summary "<one line>"\n`)
       process.stdout.write(`       PASS -> land the worktree's change onto the live branch first, then --record ${item.file} pass from the live tree (the doorway re-runs the gates in your cwd, so they must see the landed change)\n`)
     }
     process.stdout.write(

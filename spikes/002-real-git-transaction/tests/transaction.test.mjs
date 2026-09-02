@@ -30,11 +30,11 @@ function git(cwd, ...args) {
 }
 
 test('runs one canonical claim-to-record transaction through separate maker and verifier worktrees', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-002-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-002-'))
   const previousSecret = process.env.SPIKE_SECRET_SENTINEL
   process.env.SPIKE_SECRET_SENTINEL = 'must-not-cross-runtime-boundary'
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(root, 'fixture-repository')
     const workspaceRoot = join(root, 'runtime-workspaces')
     copyControlPlaneFixture(AGENT_LOOP_ROOT, controlPlaneRoot)
@@ -131,9 +131,9 @@ test('rejects verifier and gate evidence that is not bound to the exact maker ar
 })
 
 test('records fail when a passing objective test dirties the verifier worktree', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-002-dirty-gate-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-002-dirty-gate-'))
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(root, 'fixture-repository')
     const workspaceRoot = join(root, 'runtime-workspaces')
     copyControlPlaneFixture(AGENT_LOOP_ROOT, controlPlaneRoot)
@@ -161,9 +161,9 @@ test('records fail when a passing objective test dirties the verifier worktree',
 })
 
 test('ignores repository-controlled global Git config and commit hooks', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-002-hostile-git-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-002-hostile-git-'))
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(root, 'fixture-repository')
     const workspaceRoot = join(root, 'runtime-workspaces')
     copyControlPlaneFixture(AGENT_LOOP_ROOT, controlPlaneRoot)
@@ -187,9 +187,9 @@ test('ignores repository-controlled global Git config and commit hooks', async (
 })
 
 test('records an unexpected failure and removes registered worktrees and the maker branch', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-002-cleanup-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-002-cleanup-'))
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(root, 'fixture-repository')
     const workspaceRoot = join(root, 'runtime-workspaces')
     const runId = 'run-spike-002-cleanup'
@@ -209,7 +209,7 @@ test('records an unexpected failure and removes registered worktrees and the mak
     assert.ok(existsSync(join(controlPlaneRoot, 'orchestrator', 'evidence', `${runId}.failure.json`)))
     assert.equal(existsSync(join(workspaceRoot, 'maker')), false)
     assert.equal(existsSync(join(workspaceRoot, 'verifier')), false)
-    assert.equal(git(repositoryRoot, 'branch', '--list', `agent-loop/${runId}-maker`), '')
+    assert.equal(git(repositoryRoot, 'branch', '--list', `agent-control-plane/${runId}-maker`), '')
     assert.doesNotMatch(git(repositoryRoot, 'worktree', 'list', '--porcelain'), /runtime-workspaces/)
   } finally {
     rmSync(root, { recursive: true, force: true })
@@ -217,7 +217,7 @@ test('records an unexpected failure and removes registered worktrees and the mak
 })
 
 test('fixture setup ignores inherited global Git config and hooks', () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-002-fixture-git-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-002-fixture-git-'))
   const previousHome = process.env.HOME
   try {
     const fakeHome = join(root, 'home')
@@ -242,9 +242,9 @@ test('fixture setup ignores inherited global Git config and hooks', () => {
 })
 
 test('rejects any nested transaction roots before claiming an item', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-002-overlap-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-002-overlap-'))
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(controlPlaneRoot, 'nested-repository')
     const workspaceRoot = join(root, 'runtime-workspaces')
     copyControlPlaneFixture(AGENT_LOOP_ROOT, controlPlaneRoot)
@@ -267,10 +267,10 @@ test('rejects any nested transaction roots before claiming an item', async () =>
 })
 
 test('canonicalizes symlink aliases before checking root overlap', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-002-symlink-overlap-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-002-symlink-overlap-'))
   try {
-    const realControlPlaneRoot = join(root, 'real-agent-loop')
-    const aliasedControlPlaneRoot = join(root, 'agent-loop-alias')
+    const realControlPlaneRoot = join(root, 'real-agent-control-plane')
+    const aliasedControlPlaneRoot = join(root, 'agent-control-plane-alias')
     const repositoryRoot = join(realControlPlaneRoot, 'nested-repository')
     const workspaceRoot = join(root, 'runtime-workspaces')
     copyControlPlaneFixture(AGENT_LOOP_ROOT, realControlPlaneRoot)
@@ -294,7 +294,7 @@ test('canonicalizes symlink aliases before checking root overlap', async () => {
 })
 
 test('treats the filesystem root as an ancestor during overlap validation', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-002-filesystem-root-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-002-filesystem-root-'))
   try {
     const repositoryRoot = join(root, 'fixture-repository')
     const workspaceRoot = join(root, 'runtime-workspaces')

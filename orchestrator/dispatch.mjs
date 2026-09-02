@@ -15,23 +15,23 @@
 // machinery self-check uses (no second copy of the routing table to drift).
 //
 // Usage:
-//   node agent-loop/orchestrator/dispatch.mjs            # print the dispatch plan
-//   node agent-loop/orchestrator/dispatch.mjs --json     # machine-readable plan
-//   node agent-loop/orchestrator/dispatch.mjs --claim <file>
+//   node agent-control-plane/orchestrator/dispatch.mjs            # print the dispatch plan
+//   node agent-control-plane/orchestrator/dispatch.mjs --json     # machine-readable plan
+//   node agent-control-plane/orchestrator/dispatch.mjs --claim <file>
 //                                                        # mark an item in-progress (atomic move
 //                                                        # into inbox/in-progress/) so a second
 //                                                        # concurrent tick cannot re-dispatch it.
-//   node agent-loop/orchestrator/dispatch.mjs --reclaim <file>
+//   node agent-control-plane/orchestrator/dispatch.mjs --reclaim <file>
 //                                                        # return a STALE claim to the inbox so it
 //                                                        # can be dispatched again (refuses a claim
 //                                                        # younger than the staleness threshold).
-//   node agent-loop/orchestrator/dispatch.mjs --record <file> <pass|fail> [--summary "..."]
+//   node agent-control-plane/orchestrator/dispatch.mjs --record <file> <pass|fail> [--summary "..."]
 //                                                        # finalize a run: move + changelog
 //                                                        # a claimed PASS on a code-changing
 //                                                        # pipeline is re-verified here (fast
 //                                                        # objective gates); add --skip-gate to
 //                                                        # bypass for a quick manual record.
-//   node agent-loop/orchestrator/dispatch.mjs --candidates <category>
+//   node agent-control-plane/orchestrator/dispatch.mjs --candidates <category>
 //                                                        # dynamic intake/triage seam: list the
 //                                                        # pipelines registered under a valid
 //                                                        # category. Read-only — never dispatches,
@@ -84,7 +84,7 @@ function inboxItemFiles(inboxDirectory) {
     .sort()
 }
 
-// Pure planner: given the agent-loop root, return the routing decision for every inbox item.
+// Pure planner: given the agent-control-plane root, return the routing decision for every inbox item.
 // No side effects — this is the piece the regression test drives against fixtures.
 export function planDispatch(agentLoopRoot = DEFAULT_AGENT_LOOP_ROOT) {
   const registry = validatePipelineRegistry(agentLoopRoot)

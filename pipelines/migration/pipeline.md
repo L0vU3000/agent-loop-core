@@ -136,7 +136,7 @@ Eval is a different-model, read-only verifier.
 - **No progress:** stop after the same verifier failure occurs twice consecutively.
 - **Human checkpoints:** approval of the schema change, approval of Plan, and approval before
   applying the hand-authored migration.
-- **Memory:** append failures and reusable lessons to `agent-loop/memory/errors.md`.
+- **Memory:** append failures and reusable lessons to `agent-control-plane/memory/errors.md`.
 
 ## Status and trigger
 

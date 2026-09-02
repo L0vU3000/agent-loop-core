@@ -1,4 +1,4 @@
-# Errors & Lessons — agent-loop system
+# Errors & Lessons — agent-control-plane system
 
 > What broke, why, and how we stop it recurring. Newest first.
 > Format: `## [YYYY-MM-DD] <symptom>` → **Symptom / Cause / Fix / Prevention**.

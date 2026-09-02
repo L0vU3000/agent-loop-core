@@ -4,7 +4,7 @@ status: active
 created: 2026-07-21
 updated: 2026-07-21
 tags:
-  - agent-loop
+  - agent-control-plane
 ---
 
 # System overview
@@ -26,7 +26,7 @@ claiming, bookkeeping, metrics, and heartbeat state. Their boundary is deliberat
 orchestrator names work; it does not impersonate the agent runtime.
 
 See [[vault/architecture/orchestrator]], [[vault/architecture/pipeline-lifecycle]], and the
-canonical [[agent-loop|operating principles]].
+canonical [[agent-control-plane|operating principles]].
 
 ## Safety shape
 

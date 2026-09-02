@@ -4,7 +4,7 @@
 // (eval); eval on a different model. A single runId is minted once and threaded through
 // every stage (lesson from memory/errors.md — do not let stages invent their own).
 //
-// Pass the ticket path as args, e.g. Workflow({scriptPath, args: 'agent-loop/orchestrator/inbox/<ticket>.md'})
+// Pass the ticket path as args, e.g. Workflow({scriptPath, args: 'agent-control-plane/orchestrator/inbox/<ticket>.md'})
 
 export const meta = {
   name: 'feature',
@@ -12,7 +12,7 @@ export const meta = {
   phases: [{ title: 'Specify' }, { title: 'Build loop' }],
 }
 
-const P = 'agent-loop/pipelines/feature'
+const P = 'agent-control-plane/pipelines/feature'
 const LINT = 'npx eslint app lib components'
 // Provider-adaptive model tiers — Anthropic by default (the loop runs under Claude Code, so the
 // session is Claude). Pass `--provider=gpt` in args to route every stage to codex
@@ -24,7 +24,7 @@ const TIER = PROVIDER === 'gpt'
   : { read: { model: 'sonnet' }, make: { model: 'opus' }, verify: { model: 'sonnet' } }
 
 const TICKET = (args || '').replace(/\s*--provider=\S+/, '').trim()
-  || '(no ticket path passed — read the newest agent-loop/orchestrator/inbox/*.md with type: feature)'
+  || '(no ticket path passed — read the newest agent-control-plane/orchestrator/inbox/*.md with type: feature)'
 const MAX = 6
 
 const SPEC = { type: 'object', required: ['specified', 'runId'],

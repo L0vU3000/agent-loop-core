@@ -28,7 +28,7 @@ import {
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url))
 const SOURCE_ROOT = resolve(SCRIPT_DIRECTORY, '..')
 
-// Copy just enough of the real agent-loop for validatePipelineRegistry to pass in the fixture:
+// Copy just enough of the real agent-control-plane for validatePipelineRegistry to pass in the fixture:
 // the three registry docs plus every pipeline's frontmatter. The dispatcher reads its routing
 // table from that same canonical source, so the fixture exercises the real registry.
 function copyRegistryFixture(destinationRoot) {

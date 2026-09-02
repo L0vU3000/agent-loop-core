@@ -4,13 +4,13 @@ status: active
 created: 2026-07-21
 updated: 2026-07-21
 tags:
-  - agent-loop
+  - agent-control-plane
   - map
 ---
 
 # Agent loop knowledge vault
 
-`agent-loop-core` is a project-neutral template for routing work through bounded,
+`agent-control-plane` is a project-neutral template for routing work through bounded,
 evidence-driven pipelines. The deterministic orchestrator validates a work item and selects a
 pipeline. That pipeline runs Explore, Plan, Execute, and Eval with a different maker and verifier.
 The system improves by turning observed failures into small memory entries, then selecting one
@@ -32,7 +32,7 @@ No community plugin is required.
 ## Repository contracts
 
 - [[README|Public README]]
-- [[agent-loop|Operating principles]]
+- [[agent-control-plane|Operating principles]]
 - [[categories|Categories and routing policy]]
 - [[orchestrator/orchestrator|Orchestrator contract]]
 - [[pipelines/README|Pipeline registry and anatomy]]

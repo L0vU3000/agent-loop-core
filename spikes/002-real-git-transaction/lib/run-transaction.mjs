@@ -211,7 +211,7 @@ export async function runRealGitTransaction({
     throw new Error('allowedMakerPaths must contain safe repository-relative Git paths')
   }
 
-  const makerBranch = `agent-loop/${safeBranchPart(runId)}-maker`
+  const makerBranch = `agent-control-plane/${safeBranchPart(runId)}-maker`
   const existingMakerBranch = command('git', ['show-ref', '--verify', '--quiet', `refs/heads/${makerBranch}`], repositoryRoot)
   if (existingMakerBranch.exitCode === 0) throw new Error('maker branch already exists')
   if (existingMakerBranch.exitCode !== 1 || existingMakerBranch.spawnError) {

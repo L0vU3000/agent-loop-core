@@ -46,7 +46,7 @@ The **dashboard** (`../dashboard.md`) is the at-a-glance view of what's running 
 completed. It is **generated** by [`scripts/update-dashboard.sh`](../scripts/update-dashboard.sh)
 from real state (inbox files + run folders) — never hand-edited, so it can't drift. Keep it
 fresh three ways: the orchestrator regenerates it each tick (step 3); or `/loop 2m bash
-agent-loop/scripts/update-dashboard.sh` while a workflow runs; or run it by hand anytime.
+agent-control-plane/scripts/update-dashboard.sh` while a workflow runs; or run it by hand anytime.
 
 Keep the router's own context **lean** — it reads a one-line summary per item and a
 pipeline registry, nothing more. It must never accumulate the full history of every run
@@ -131,9 +131,9 @@ The routing + bookkeeping half of the heartbeat is now executable:
 that should never spend a model call.
 
 ```
-node agent-loop/orchestrator/dispatch.mjs            # print the dispatch plan (dry run)
-node agent-loop/orchestrator/dispatch.mjs --json     # same plan, machine-readable
-node agent-loop/orchestrator/dispatch.mjs --record <file> <pass|fail> [--summary "..."]
+node agent-control-plane/orchestrator/dispatch.mjs            # print the dispatch plan (dry run)
+node agent-control-plane/orchestrator/dispatch.mjs --json     # same plan, machine-readable
+node agent-control-plane/orchestrator/dispatch.mjs --record <file> <pass|fail> [--summary "..."]
 ```
 
 What it does each tick:
@@ -169,8 +169,8 @@ request to a valid `category` before it can commit to an exact `type`. `dispatch
 seam for exactly that case, and nothing more:
 
 ```
-node agent-loop/orchestrator/dispatch.mjs --candidates <category>          # human-readable
-node agent-loop/orchestrator/dispatch.mjs --candidates <category> --json   # machine-readable
+node agent-control-plane/orchestrator/dispatch.mjs --candidates <category>          # human-readable
+node agent-control-plane/orchestrator/dispatch.mjs --candidates <category> --json   # machine-readable
 ```
 
 It looks up the same registry `planDispatch()` reads and returns the pipelines registered under
@@ -198,7 +198,7 @@ emits *which* workflow to run for *which* item; the runtime runs it and reports 
 primitives allow. Trigger it on a cadence (never a raw `while(true)`):
 
 ```
-/loop 30m node agent-loop/orchestrator/tick.mjs      # local
+/loop 30m node agent-control-plane/orchestrator/tick.mjs      # local
 # or a /schedule cloud routine running the same command
 ```
 

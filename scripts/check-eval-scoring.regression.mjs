@@ -69,7 +69,7 @@ async function runBugFixWorkflow({ plans = [passingPlan()], verdicts = [passingV
       return {
         reproduced: true,
         runId: 'scoring-regression',
-        testPath: 'agent-loop/scripts/check-eval-scoring.regression.mjs',
+        testPath: 'agent-control-plane/scripts/check-eval-scoring.regression.mjs',
         rootCause: 'the workflow exit predicate trusts an incomplete Eval result',
       }
     }
@@ -119,7 +119,7 @@ async function runFeatureWorkflow({
       return {
         specified: true,
         runId: 'feature-scoring-regression',
-        testPath: 'agent-loop/scripts/check-eval-scoring.regression.mjs',
+        testPath: 'agent-control-plane/scripts/check-eval-scoring.regression.mjs',
         criteria: 'the feature workflow must enforce every critical Eval fact',
       }
     }

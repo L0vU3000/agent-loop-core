@@ -30,7 +30,7 @@ unattended without lying to itself.
 
 - The stage files (`*.md`) are the **definition** — the prompts, committed to git.
 - `runs/` holds the **transient state of one execution** — findings, plans, logs. It is
-  **gitignored** (`agent-loop/pipelines/*/runs/`). Never mix the two.
+  **gitignored** (`agent-control-plane/pipelines/*/runs/`). Never mix the two.
 
 ## Anatomy checklist (every pipeline must have)
 

@@ -4,7 +4,7 @@ status: active
 created: "{{date:YYYY-MM-DD}}"
 updated: "{{date:YYYY-MM-DD}}"
 tags:
-  - agent-loop
+  - agent-control-plane
 ---
 
 # Open question

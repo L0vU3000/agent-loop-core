@@ -12,7 +12,7 @@
 // Isolation: execute runs in a git worktree (harness-provided), so the maker's edits never touch
 // the live tree; see pipeline.md Guardrails. Data-touching services use the dev database only.
 //
-// Pass the ticket path as args, e.g. Workflow({scriptPath, args: 'agent-loop/orchestrator/inbox/<ticket>.md'})
+// Pass the ticket path as args, e.g. Workflow({scriptPath, args: 'agent-control-plane/orchestrator/inbox/<ticket>.md'})
 
 export const meta = {
   name: 'api-tool',
@@ -20,7 +20,7 @@ export const meta = {
   phases: [{ title: 'Specify' }, { title: 'Wire loop' }],
 }
 
-const P = 'agent-loop/pipelines/api-tool'
+const P = 'agent-control-plane/pipelines/api-tool'
 const LINT = 'npx eslint app lib components mcp-server'
 // Provider-adaptive model tiers — Anthropic by default (the loop runs under Claude Code, so the
 // session is Claude). Pass `--provider=gpt` in args to route every stage to codex
@@ -32,7 +32,7 @@ const TIER = PROVIDER === 'gpt'
   : { read: { model: 'sonnet' }, make: { model: 'opus' }, verify: { model: 'sonnet' } }
 
 const TICKET = (args || '').replace(/\s*--provider=\S+/, '').trim()
-  || '(no ticket path passed — read the newest agent-loop/orchestrator/inbox/*.md with type: api-tool)'
+  || '(no ticket path passed — read the newest agent-control-plane/orchestrator/inbox/*.md with type: api-tool)'
 const MAX = 6
 
 const SPEC = { type: 'object', required: ['specified', 'runId'],

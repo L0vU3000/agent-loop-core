@@ -6,7 +6,7 @@ type: pipeline-improve
 
 # Pipeline: pipeline-improve
 
-> Reads agent-loop memory and recent run evidence, selects one machinery weakness, changes
+> Reads agent-control-plane memory and recent run evidence, selects one machinery weakness, changes
 > only that weakness, and requires an independent verifier to prove the system is clearer
 > or stronger.
 
@@ -19,7 +19,7 @@ an existing safety or verification signal.
 
 Explore must identify one concrete failure, recurring lesson, drift risk, or weak check from:
 
-- `agent-loop/memory/errors.md`, `decisions.md`, and `changelog.md`;
+- `agent-control-plane/memory/errors.md`, `decisions.md`, and `changelog.md`;
 - the newest completed and failed `pipelines/*/runs/*/eval.md` evidence;
 - current machinery scripts, pipeline definitions, and routing registries.
 
@@ -39,7 +39,7 @@ A run passes only when all checks are true:
 3. Execute implements only the approved improvement and does not commit it.
 4. A fresh verifier proves the focused check fails on the controlled old/drifted condition and
    passes on the corrected condition.
-5. `bash agent-loop/scripts/check-machinery.sh`, `npx vitest run`, `npx tsc --noEmit`, and
+5. `bash agent-control-plane/scripts/check-machinery.sh`, `npx vitest run`, `npx tsc --noEmit`, and
    `npx eslint app lib components` all retain or improve their starting health — confirmed by an
    independent gate-runner agent (separate from the rubric verifier), with ESLint measured against
    Explore's pre-change baseline. The rubric verifier's self-report of these gates must match the
@@ -80,7 +80,7 @@ type in a temporary copy and requires a failure before restoring the matching me
   invocation, and a declared 45,000-token ceiling.
 - **No progress:** stop when the same verifier failure repeats twice consecutively.
 - **Memory:** every failed Eval appends a factual Symptom / Cause / Fix / Prevention entry to
-  `agent-loop/memory/errors.md`. Unknown causes stay explicitly unknown.
+  `agent-control-plane/memory/errors.md`. Unknown causes stay explicitly unknown.
 
 The Workflow API can prevent new calls after the time or agent-call bound, but it cannot
 cancel a call already in flight. It does not expose live token usage, so the agent-call cap

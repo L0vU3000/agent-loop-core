@@ -9,7 +9,7 @@ export const meta = {
   phases: [{ title: 'Scope and plan' }, { title: 'Author migration' }, { title: 'Apply and verify' }],
 }
 
-const P = 'agent-loop/pipelines/migration'
+const P = 'agent-control-plane/pipelines/migration'
 const RAW_ARGS = args || ''
 const MAX_ATTEMPTS = 4
 const MAX_AGENT_CALLS = 7
@@ -304,7 +304,7 @@ if (!budgetAvailable()) {
 recordAgentCall()
 await agent(
   `You are the failure-memory recorder for migration run ${RUN}, attempt ${attempt}.
-   Append one factual entry to agent-loop/memory/errors.md using its existing Symptom / Cause /
+   Append one factual entry to agent-control-plane/memory/errors.md using its existing Symptom / Cause /
    Fix / Prevention format. The verifier failure was: ${failure}. If the cause is not proven,
    say it is not established; do not speculate and do not edit any other file.`,
   { label: `memory#${attempt}`, phase: 'Apply and verify' },

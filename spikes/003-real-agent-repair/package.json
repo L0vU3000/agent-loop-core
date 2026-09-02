@@ -1,5 +1,5 @@
 {
-  "name": "agent-loop-real-agent-repair-spike",
+  "name": "agent-control-plane-real-agent-repair-spike",
   "version": "0.0.0",
   "private": true,
   "type": "module",

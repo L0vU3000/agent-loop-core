@@ -16,7 +16,7 @@ future pipelines certify unsafe work.
    the implementation.
 3. Run the focused regression command from Plan. Require proof that its controlled old or
    drifted condition is rejected and the valid condition is accepted.
-4. Run `bash agent-loop/scripts/check-machinery.sh` and require every machinery check to pass.
+4. Run `bash agent-control-plane/scripts/check-machinery.sh` and require every machinery check to pass.
 5. Run `npx vitest run`, `npx tsc --noEmit`, and `npx eslint app lib components`. ESLint may
    not exceed Explore's warning baseline.
 6. Inspect the diff for weakened Eval checks, regression gates, approval gates, database

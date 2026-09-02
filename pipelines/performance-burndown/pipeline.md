@@ -84,7 +84,7 @@ Every failed Eval returns its evidence to Plan before another attempt.
 - **No progress:** stop after two consecutive rejected attempts or when Plan has no untried grounded lever.
 - **Data safety:** dev database only for query work; read-only measurement; never production,
   destructive SQL, or a destructive seed reset.
-- **Memory:** append measurement landmines and rejected levers to `agent-loop/memory/errors.md`.
+- **Memory:** append measurement landmines and rejected levers to `agent-control-plane/memory/errors.md`.
 
 ## Status and trigger
 

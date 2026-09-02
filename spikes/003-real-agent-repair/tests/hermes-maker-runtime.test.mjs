@@ -50,7 +50,7 @@ test('refuses to expose the credential home unless the unsandboxed spike is expl
 })
 
 test('rejects non-finite usage evidence from the maker process', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-003-invalid-usage-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-003-invalid-usage-'))
   try {
     const repositoryRoot = join(root, 'repository')
     createBrokenRepository(repositoryRoot)
@@ -79,7 +79,7 @@ writeFileSync(args[usageIndex + 1], '{"model":"fake","provider":"fake","api_call
 })
 
 test('Hermes maker runs in the assigned worktree, fixes/tests/commits, and excludes parent secrets', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-003-runtime-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-003-runtime-'))
   const previousSecret = process.env.SPIKE_SECRET_SENTINEL
   process.env.SPIKE_SECRET_SENTINEL = 'must-not-cross-maker-boundary'
   try {
@@ -119,9 +119,9 @@ test('Hermes maker runs in the assigned worktree, fixes/tests/commits, and exclu
 })
 
 test('claim-to-record transaction delegates the repair commit to the maker runtime and persists runtime evidence', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-003-transaction-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-003-transaction-'))
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(root, 'repository')
     const workspaceRoot = join(root, 'workspaces')
     const fakeHermes = join(root, 'fake-hermes.mjs')
@@ -144,7 +144,7 @@ test('claim-to-record transaction delegates the repair commit to the maker runti
     })
 
     assert.equal(result.maker.parentCommit, baseCommit)
-    assert.match(result.maker.branch, /^agent-loop\//)
+    assert.match(result.maker.branch, /^agent-control-plane\//)
     assert.equal(result.maker.runtime.runtime, 'hermes')
     assert.equal(result.maker.runtime.usage.model, 'fake-model')
     assert.equal(result.verification.verifier, 'independent-git-worktree')
@@ -160,13 +160,13 @@ test('claim-to-record transaction delegates the repair commit to the maker runti
 })
 
 test('cleans a registered maker worktree even if its directory disappears before failure handling', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-003-missing-worktree-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-003-missing-worktree-'))
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(root, 'repository')
     const workspaceRoot = join(root, 'workspaces')
     const runId = 'run-spike-003-missing-worktree'
-    const branch = `agent-loop/${runId}-maker`
+    const branch = `agent-control-plane/${runId}-maker`
     copyControlPlaneFixture(AGENT_LOOP_ROOT, controlPlaneRoot)
     writeBugItem(controlPlaneRoot)
     createBrokenRepository(repositoryRoot)
@@ -195,9 +195,9 @@ test('cleans a registered maker worktree even if its directory disappears before
 })
 
 test('sanitizes untrusted maker failure text before evidence and dispatch logging', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-003-log-injection-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-003-log-injection-'))
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(root, 'repository')
     const workspaceRoot = join(root, 'workspaces')
     const runId = 'run-spike-003-log-injection'
@@ -229,9 +229,9 @@ test('sanitizes untrusted maker failure text before evidence and dispatch loggin
 })
 
 test('records fail if the maker mutates the original checkout outside its worktree', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-003-original-checkout-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-003-original-checkout-'))
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(root, 'repository')
     const workspaceRoot = join(root, 'workspaces')
     copyControlPlaneFixture(AGENT_LOOP_ROOT, controlPlaneRoot)
@@ -264,9 +264,9 @@ test('records fail if the maker mutates the original checkout outside its worktr
 })
 
 test('rejects a maker commit that weakens repository-controlled tests', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-003-test-tamper-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-003-test-tamper-'))
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(root, 'repository')
     const workspaceRoot = join(root, 'workspaces')
     copyControlPlaneFixture(AGENT_LOOP_ROOT, controlPlaneRoot)
@@ -293,9 +293,9 @@ test('rejects a maker commit that weakens repository-controlled tests', async ()
 })
 
 test('rejects a maker merge commit even when its first parent is the base commit', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-003-merge-commit-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-003-merge-commit-'))
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(root, 'repository')
     const workspaceRoot = join(root, 'workspaces')
     copyControlPlaneFixture(AGENT_LOOP_ROOT, controlPlaneRoot)
@@ -325,13 +325,13 @@ test('rejects a maker merge commit even when its first parent is the base commit
 })
 
 test('a pre-existing maker branch is rejected before claim and is never deleted', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-003-branch-collision-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-003-branch-collision-'))
   try {
-    const controlPlaneRoot = join(root, 'agent-loop')
+    const controlPlaneRoot = join(root, 'agent-control-plane')
     const repositoryRoot = join(root, 'repository')
     const workspaceRoot = join(root, 'workspaces')
     const runId = 'run-spike-003-branch-collision'
-    const branch = `agent-loop/${runId}-maker`
+    const branch = `agent-control-plane/${runId}-maker`
     copyControlPlaneFixture(AGENT_LOOP_ROOT, controlPlaneRoot)
     writeBugItem(controlPlaneRoot)
     const baseCommit = createBrokenRepository(repositoryRoot)

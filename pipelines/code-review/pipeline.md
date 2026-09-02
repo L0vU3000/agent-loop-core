@@ -118,13 +118,13 @@ is a different-model, read-only verifier.
   human gate catch.
 - **Human checkpoint.** The review category's default gate applies: the owner reviews the findings
   and decides which to act on. A drafted fix ticket is promoted from `runs/<run-id>/` to
-  `agent-loop/orchestrator/inbox/` with `approved: true` only after the owner approves it. No
+  `agent-control-plane/orchestrator/inbox/` with `approved: true` only after the owner approves it. No
   building pipeline consumes an unapproved fix ticket.
 - **Findings are advisory.** The pipeline reports; it does not fix. A fix routes to a building
   ticket the owner approves — product and correctness judgment stays with the owner.
 - **Bounds:** maximum 3 review attempts and a small agent-call cap per invocation; stop after the
   same verifier failure repeats twice.
-- **Memory:** append failures and reusable lessons to `agent-loop/memory/errors.md`.
+- **Memory:** append failures and reusable lessons to `agent-control-plane/memory/errors.md`.
 
 ## Exit routing
 

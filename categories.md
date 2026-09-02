@@ -11,7 +11,7 @@
 - The **orchestrator** uses both to route an inbox item, then dispatches one pipeline.
 
 Categories are metadata, not another directory level. Keep pipeline definitions at
-`agent-loop/pipelines/<pipeline-name>/` so the dashboard, ignore rules, and machinery checks
+`agent-control-plane/pipelines/<pipeline-name>/` so the dashboard, ignore rules, and machinery checks
 continue to work with one stable layout.
 
 ## Categories
@@ -102,7 +102,7 @@ The orchestrator validates the pair against its registry. Dynamic intake may be 
 when it can identify only a category, it may ask the read-only registry seam for the candidates:
 
 ```bash
-node agent-loop/orchestrator/dispatch.mjs --candidates <category> --json
+node agent-control-plane/orchestrator/dispatch.mjs --candidates <category> --json
 ```
 
 That call only narrows the registered choices; it neither chooses a pipeline nor changes inbox

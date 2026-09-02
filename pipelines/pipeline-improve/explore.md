@@ -5,7 +5,7 @@ only write is `runs/<run-id>/explore.md`.
 
 ## Work
 
-1. Read `agent-loop/memory/errors.md`, `decisions.md`, and `changelog.md`, then inspect the
+1. Read `agent-control-plane/memory/errors.md`, `decisions.md`, and `changelog.md`, then inspect the
    newest relevant `pipelines/*/runs/*/eval.md` files.
 2. Read the current machinery scripts and pipeline definitions related to the strongest
    evidenced weakness. Use Graphify for structural orientation, but verify the current files

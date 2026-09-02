@@ -1,8 +1,8 @@
-# Memory — the agent-loop's self-improvement substrate
+# Memory — the agent-control-plane's self-improvement substrate
 
 > This folder is why the system can **optimize itself**. A loop that doesn't record what
 > it did, what broke, and why we chose a design is doomed to repeat its mistakes. This is
-> the same idea as a project knowledge vault, scoped to the agent-loop: *if a human wrote
+> the same idea as a project knowledge vault, scoped to the agent-control-plane: *if a human wrote
 > it or an agent should keep evolving it, it lives here.*
 
 It mirrors the vault's own layout on purpose:
@@ -30,7 +30,7 @@ Every pipeline's **`eval` stage feeds this folder**:
 The system is **never finished**. On a cadence, a review pass reads this folder and asks:
 *what's the most common error? which stage is slowest? which pipeline has the weakest
 verification?* — and proposes the next improvement. See
-["This is an evolving system"](../agent-loop.md#this-is-an-evolving-system) in the hub doc.
+["This is an evolving system"](../agent-control-plane.md#this-is-an-evolving-system) in the hub doc.
 
 Keep entries short and dated (`YYYY-MM-DD`). Newest first.
 

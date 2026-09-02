@@ -12,8 +12,8 @@ function sampleWorkflow(overrides = {}) {
   return {
     runId: 'wf_test_0001',
     workflowName: 'bug-fix',
-    scriptPath: '/repo/agent-loop/pipelines/bug-fix/workflow.js',
-    args: 'agent-loop/orchestrator/inbox/2026-07-16-some-bug.md',
+    scriptPath: '/repo/agent-control-plane/pipelines/bug-fix/workflow.js',
+    args: 'agent-control-plane/orchestrator/inbox/2026-07-16-some-bug.md',
     status: 'completed',
     timestamp: '2026-07-16T04:00:00.000Z',
     defaultModel: 'claude-opus-4-8[1m]',
@@ -45,7 +45,7 @@ test('toRow maps run-level cost and the result object', () => {
 
 test('toRow parses the ticket path out of args', () => {
   const row = toRow(sampleWorkflow(), REPO)
-  assert.equal(row.ticket, 'agent-loop/orchestrator/inbox/2026-07-16-some-bug.md')
+  assert.equal(row.ticket, 'agent-control-plane/orchestrator/inbox/2026-07-16-some-bug.md')
 })
 
 test('toRow captures one stage row per workflow_agent with per-stage cost', () => {

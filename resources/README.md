@@ -117,7 +117,7 @@ check, the stop condition, or the trigger) → start simple → iterate.
 **OpenAI — Unrolling the Codex Agent Loop.** How the Codex loop actually runs *under the hood*
 — the mechanical view. *(The openai.com page is JS/Cloudflare-gated and won't auto-fetch;
 open it in a browser. Details below are from OpenAI's text + a faithful deep-dive.)*
-- https://openai.com/index/unrolling-the-codex-agent-loop/
+- https://openai.com/index/unrolling-the-codex-agent-control-plane/
 - Deep-dive mirror: https://codex.danielvaughan.com/2026/03/28/codex-agent-loop-deep-dive/
 - Also good: https://cohorte.co/blog/unrolling-the-codex-agent-loop-without-losing-your-mind
 

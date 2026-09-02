@@ -1,4 +1,4 @@
-# agent-loop-core
+# agent-control-plane
 
 A reusable, self-improving agent-loop: many peer pipelines organized by category,
 each owning `explore → plan → execute → eval` with a separate verifier, driven by an
@@ -7,7 +7,7 @@ Node built-ins.
 
 This repo is a **template you copy into a project**, not a library you link. Pipelines
 get tuned per project (that's the point), so each project owns its copy and diverges
-freely. See `agent-loop.md` for the operating principles.
+freely. See `agent-control-plane.md` for the operating principles.
 
 ## What travels vs what stays
 
@@ -15,7 +15,7 @@ freely. See `agent-loop.md` for the operating principles.
 |---|---|
 | `orchestrator/*.mjs`, `scripts/*` — the machinery | `pipelines/*/runs/` — run history |
 | Pipeline scaffolds (`explore/plan/execute/eval` shapes) | `orchestrator/inbox`, `done` queues |
-| `categories.md`, `agent-loop.md`, docs | `memory/run-metrics.jsonl`, `.heartbeat`, dispatch log |
+| `categories.md`, `agent-control-plane.md`, docs | `memory/run-metrics.jsonl`, `.heartbeat`, dispatch log |
 | `memory/*` as **empty templates** | the accumulated entries you write into them |
 
 ## Use it in a new project
@@ -23,15 +23,15 @@ freely. See `agent-loop.md` for the operating principles.
 ```bash
 # 1. Copy the core in, one level under your repo root
 cd /path/to/your-project
-npx degit your-org/agent-loop-core agent-loop
+npx degit your-org/agent-control-plane agent-control-plane
 
 # 2. Reset instance data + check STACK.md
-node agent-loop/init.mjs
+node agent-control-plane/init.mjs
 
-# 3. Fill in agent-loop/STACK.md — your database / ORM / auth / services layer
+# 3. Fill in agent-control-plane/STACK.md — your database / ORM / auth / services layer
 
 # 4. Run one tick (empty inbox is fine — it just heartbeats)
-node agent-loop/orchestrator/tick.mjs
+node agent-control-plane/orchestrator/tick.mjs
 ```
 
 For Claude Code users, `init.mjs` installs `.claude/commands/orchestrate.md` at the consuming
@@ -69,8 +69,8 @@ caches, hotkeys, and project attachments are ignored.
 ## Layout
 
 ```
-agent-loop/
-├── agent-loop.md        ← entry point + operating principles (read first)
+agent-control-plane/
+├── agent-control-plane.md        ← entry point + operating principles (read first)
 ├── categories.md        ← pipeline categories + routing policy
 ├── init.mjs             ← adopt-into-project: reset instance data + report tuned files
 ├── orchestrator/        ← inbox → dispatch → tick machinery (*.mjs)
@@ -87,6 +87,12 @@ agent-loop/
 ├── .claude/commands/    ← bundled `/orchestrate` source; init installs it at the project root
 └── scripts/             ← regression checks + dashboard (run scripts/check-machinery.sh)
 ```
+
+## Target Integration: Hermes
+
+`agent-control-plane` is designed to be invoked by a higher-level harness (e.g., Hermes). While Hermes manages the **"when"** and **"who"** (scheduling, profiles, sessions, and human approvals), `agent-control-plane` manages the **"if"** (deterministic claim identity, legal stage transitions, and objective verification of completion).
+
+It is intended to expose a narrow, typed adapter surface to the harness and deliberately does not duplicate runtime scheduling, durable task boards, or session management. This is a target architectural boundary, not a pre-existing plugin implementation.
 
 ## Keeping the machinery healthy
 

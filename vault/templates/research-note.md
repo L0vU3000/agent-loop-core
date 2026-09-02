@@ -4,7 +4,7 @@ status: draft
 created: "{{date:YYYY-MM-DD}}"
 updated: "{{date:YYYY-MM-DD}}"
 tags:
-  - agent-loop
+  - agent-control-plane
 ---
 
 # Research question
@@ -19,6 +19,6 @@ tags:
 
 ## Uncertainty
 
-## Relevance to the agent-loop
+## Relevance to the agent-control-plane
 
 ## Follow-up

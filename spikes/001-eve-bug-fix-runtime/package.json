@@ -1,9 +1,9 @@
 {
-  "name": "agent-loop-eve-bug-fix-spike",
+  "name": "agent-control-plane-eve-bug-fix-spike",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Disposable spike validating Eve as a durable runtime adapter for agent-loop-core's bug-fix pipeline.",
+  "description": "Disposable spike validating Eve as a durable runtime adapter for agent-control-plane's bug-fix pipeline.",
   "scripts": {
     "test": "npm exec --yes --package=node@24 -- node --test tests/runtime-adapter.test.mjs",
     "typecheck": "npm exec --yes --package=node@24 -- node node_modules/typescript/bin/tsc --noEmit",

@@ -1,4 +1,4 @@
-# Changelog — agent-loop system
+# Changelog — agent-control-plane system
 
 > What changed in the loop machinery and when. Newest first. One entry per change.
 > Format: `## [YYYY-MM-DD] <what changed>` + a line or two of why.

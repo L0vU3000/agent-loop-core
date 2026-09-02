@@ -10,7 +10,7 @@ export const meta = {
   phases: [{ title: 'Triage' }, { title: 'Fix loop' }],
 }
 
-const P = 'agent-loop/pipelines/e2e-regression'
+const P = 'agent-control-plane/pipelines/e2e-regression'
 const LINT = 'npx eslint app lib components'
 const MAX = 4
 

@@ -102,6 +102,31 @@ isolation), **Subagents** (read-only reviewer vs. write-enabled implementer), **
 
 ---
 
+## Integration Boundary: Hermes vs. Core
+
+The `agent-control-plane` is an installable deterministic control-plane toolkit. It is designed to be invoked by a higher-level harness (e.g., Hermes).
+
+### The Division of Labor
+- **Hermes (The Outer Harness/Runtime)**: Owns the **"When"** and **"Who"**.
+  - Interfaces, sessions, and human approvals.
+  - Kanban DAG scheduling and dispatch.
+  - Profiles, model routing, and delegation.
+  - Cron, goals, and generic worktree lifecycle.
+- **agent-control-plane (The Control Plane)**: Owns the **"If"**.
+  - Claim/run identity and exact artifact/commit binding.
+  - Acceptance-contract/rubric locking.
+  - Legal stage transitions (Explore → Plan → Execute → Eval).
+  - Objective gate and independent-verifier evidence.
+  - Digest-bound canonical outcomes and bounded retry/block semantics.
+
+### Implementation Principles
+- **Narrow Surface**: `agent-control-plane` exposes a narrow typed tool/adapter surface to Hermes.
+- **No Duplication**: The core must not duplicate Hermes’s scheduler, durable task board, profiles/sessions, or generic agent swarm.
+- **Deterministic Edges**: Outer known edges remain deterministic. Bounded model loops are used within judgment-heavy stages; read-only fan-out is added only when it preserves provenance.
+- **Target State**: This represents the intended integration boundary; it is not a claim of an existing plugin or MCP integration.
+
+---
+
 ## The autonomy slider (don't jump to full-auto)
 
 Karpathy: don't try to build a self-driving car on day one. Build a **co-pilot with an
@@ -175,7 +200,7 @@ Start at #1, keep the slider left, move it right only after a loop proves itself
 it as "done," it starts rotting: pipelines drift, the same errors recur, slow stages stay
 slow. So the system must **always be searching for ways to optimize itself.**
 
-That's what [`memory/`](./memory/README.md) is for — the agent-loop's own mini-vault, mirroring
+That's what [`memory/`](./memory/README.md) is for — the agent-control-plane's own mini-vault, mirroring
 whatever project knowledge vault you keep:
 
 - [`memory/changelog.md`](./memory/changelog.md) — what changed in the machinery, dated.
@@ -199,8 +224,8 @@ must not be promoted upstream automatically.
 ## What's built (the scaffold)
 
 ```
-agent-loop/
-├── agent-loop.md          ← this hub doc
+agent-control-plane/
+├── agent-control-plane.md          ← this hub doc
 ├── categories.md          ← pipeline categories + routing policy
 ├── skills-library.md      ← the installed loop toolkit we assemble from
 ├── dashboard.md           ← generated live view: running / queued / completed

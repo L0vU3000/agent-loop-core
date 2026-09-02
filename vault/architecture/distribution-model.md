@@ -4,13 +4,13 @@ status: active
 created: 2026-07-21
 updated: 2026-07-21
 tags:
-  - agent-loop
+  - agent-control-plane
   - distribution
 ---
 
 # Distribution model
 
-`agent-loop-core` is copied into a project with `degit`; it is not linked as a package or Git
+`agent-control-plane` is copied into a project with `degit`; it is not linked as a package or Git
 submodule. The consuming project owns the copy and may tune its pipeline prompts and fill
 [[STACK]] without coupling ordinary work to an upstream repository.
 
@@ -21,4 +21,4 @@ does not yet implement automatic synchronization. See
 dry-run, sanitized-patch, leak-scan, and human-approval workflow.
 
 Project-owned knowledge and runtime state never become upstream source merely because they live
-under a copied agent-loop directory. See [[vault/architecture/knowledge-layers]].
+under a copied agent-control-plane directory. See [[vault/architecture/knowledge-layers]].

@@ -13,7 +13,7 @@ export const meta = {
   phases: [{ title: 'Drive' }, { title: 'Fix loop' }],
 }
 
-const P = 'agent-loop/pipelines/qa'
+const P = 'agent-control-plane/pipelines/qa'
 const LINT = 'npx eslint app lib components'
 // Provider-adaptive model tiers — Anthropic by default (the loop runs under Claude Code, so the
 // session is Claude). Pass `--provider=gpt` in args to route every stage to codex

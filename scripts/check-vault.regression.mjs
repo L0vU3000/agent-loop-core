@@ -11,7 +11,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const TEMP_ROOTS = []
 
 function makeFixture() {
-  const root = mkdtempSync(join(tmpdir(), 'agent-loop-vault-'))
+  const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-vault-'))
   TEMP_ROOTS.push(root)
 
   for (const path of ['.obsidian', 'vault']) cpSync(join(REPO_ROOT, path), join(root, path), { recursive: true })
@@ -19,7 +19,7 @@ function makeFixture() {
     '.gitignore',
     'README.md',
     'STACK.md',
-    'agent-loop.md',
+    'agent-control-plane.md',
     'categories.md',
     'orchestrator/orchestrator.md',
     'orchestrator/dispatch-log.md',
@@ -64,12 +64,19 @@ test('missing operational paths and broken home links fail closed', () => {
   assert(errors.some((error) => error.includes('missing Map of Content link [[README]]')))
 })
 
-test('invalid curated frontmatter is rejected', () => {
+test('invalid curated frontmatter and missing product tags are rejected', () => {
   const root = makeFixture()
   const note = join(root, 'vault/architecture/system-overview.md')
-  writeFileSync(note, readFileSync(note, 'utf8').replace('status: active', 'status: private'))
+  writeFileSync(
+    note,
+    readFileSync(note, 'utf8')
+      .replace('status: active', 'status: private')
+      .replace('  - agent-control-plane', '  - unrelated-product'),
+  )
 
-  assert(validateFixture(root).some((error) => error.includes("unsupported status 'private'")))
+  const errors = validateFixture(root)
+  assert(errors.some((error) => error.includes("unsupported status 'private'")))
+  assert(errors.some((error) => error.includes('tags must include agent-control-plane')))
 })
 
 test('tracked personal Obsidian state and generated run state are rejected', () => {
