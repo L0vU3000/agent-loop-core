@@ -42,6 +42,13 @@ The command reads `STACK.md` rather than assuming a particular database, auth pr
 deployment platform. Existing projects should copy the command manually rather than re-run
 `init.mjs`, which resets loop state.
 
+For Cursor users, `init.mjs` also installs the project rule
+`.cursor/rules/agent-control-plane.mdc` and portable Agent Skill
+`.agents/skills/agent-control-plane-transaction/SKILL.md` at the consuming project root. Existing
+files at either path are retained, so project-specific versions are never overwritten. This is the
+phase-1 Cursor integration: it adds prompt-level workflow guidance only, with no custom MCP server or
+hooks yet.
+
 The pipelines are already project-neutral: they refer to your stack by **role** (the
 database, the data layer, the auth provider, the services layer) and defer the concrete
 tool/path to [`STACK.md`](STACK.md). Fill that one file in and every pipeline knows your
@@ -85,6 +92,8 @@ agent-control-plane/
 ├── vault/               ← curated human knowledge + protected project skeleton
 ├── .obsidian/           ← repository-safe shared Obsidian settings
 ├── .claude/commands/    ← bundled `/orchestrate` source; init installs it at the project root
+├── .cursor/rules/       ← bundled Cursor project rule; init installs it at the project root
+├── .agents/skills/      ← bundled portable Cursor skill; init installs it at the project root
 └── scripts/             ← regression checks + dashboard (run scripts/check-machinery.sh)
 ```
 

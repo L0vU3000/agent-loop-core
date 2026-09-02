@@ -1,0 +1,9 @@
+---
+description: Route bounded code changes through the agent-control-plane workflow when it is present.
+alwaysApply: true
+---
+
+For code-changing work, use the `agent-control-plane-transaction` skill and follow the repository's
+`AGENTS.md` and `agent-control-plane/STACK.md`. Surface every required approval to the user; this rule
+is guidance, not authorization, and never permits self-approval. Ordinary read-only investigation and
+simple questions do not need the control-plane workflow.

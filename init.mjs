@@ -99,7 +99,35 @@ if (existsSync(bundledOrchestrateCommand)) {
   }
 }
 
-// --- 4. check STACK.md has been filled in --------------------------------
+// --- 4. install project-level Cursor assets ------------------------------
+// Cursor discovers project rules and portable Agent Skills from the consuming project root.
+// Install each bundled asset independently so a project can customize either one safely.
+const cursorAssets = [
+  {
+    label: 'Cursor rule',
+    path: join('.cursor', 'rules', 'agent-control-plane.mdc'),
+  },
+  {
+    label: 'Cursor skill',
+    path: join('.agents', 'skills', 'agent-control-plane-transaction', 'SKILL.md'),
+  },
+]
+
+for (const asset of cursorAssets) {
+  const source = join(AGENT_LOOP_ROOT, asset.path)
+  const destination = join(REPO_ROOT, asset.path)
+  if (!existsSync(source)) continue
+
+  if (existsSync(destination)) {
+    log(`ℹ Kept existing ${asset.label}: ${asset.path}`)
+  } else {
+    mkdirSync(dirname(destination), { recursive: true })
+    copyFileSync(source, destination)
+    log(`✔ Installed ${asset.label}: ${asset.path}`)
+  }
+}
+
+// --- 5. check STACK.md has been filled in --------------------------------
 // The pipelines refer to your stack by role (database, ORM, auth, services layer).
 // STACK.md is the one file mapping each role to the concrete tool/path in THIS
 // project. Its table ships with the middle column blank; flag rows still empty.
