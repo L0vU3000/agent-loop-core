@@ -12,8 +12,8 @@
 //     an AI judgment the /intake command makes on top of this deterministic floor.
 //
 // Usage:
-//   node agent-loop/orchestrator/check-work-item.mjs <path-to-item.md>
-//   node agent-loop/orchestrator/check-work-item.mjs <path> --json
+//   node agent-control-plane/orchestrator/check-work-item.mjs <path-to-item.md>
+//   node agent-control-plane/orchestrator/check-work-item.mjs <path> --json
 
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'

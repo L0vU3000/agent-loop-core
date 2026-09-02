@@ -72,7 +72,7 @@ unchanged release record before completion.
 - **Bounds:** at most 3 attempts, 8 agent calls per invocation, and a declared 55,000-token ceiling.
 - **No progress:** stop after the same verifier failure repeats twice or evidence cannot tie notes,
   commit, and deployment together.
-- **Memory:** append reusable release failures to `agent-loop/memory/errors.md`.
+- **Memory:** append reusable release failures to `agent-control-plane/memory/errors.md`.
 - **Authoring safety:** structural checks never merge, deploy, monitor production, roll back,
   publish, or announce.
 

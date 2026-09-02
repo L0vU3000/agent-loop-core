@@ -8,7 +8,7 @@
 // re-verifies every reported finding and DROPS any it cannot reproduce. One runId is minted once
 // and threaded through every stage (memory/errors.md).
 //
-// Pass the ticket path as args, e.g. Workflow({scriptPath, args: 'agent-loop/orchestrator/inbox/<ticket>.md'})
+// Pass the ticket path as args, e.g. Workflow({scriptPath, args: 'agent-control-plane/orchestrator/inbox/<ticket>.md'})
 
 export const meta = {
   name: 'code-review',
@@ -16,7 +16,7 @@ export const meta = {
   phases: [{ title: 'Frame' }, { title: 'Review loop' }],
 }
 
-const P = 'agent-loop/pipelines/code-review'
+const P = 'agent-control-plane/pipelines/code-review'
 // Provider-adaptive model tiers — Anthropic by default (the loop runs under Claude Code). Pass
 // `--provider=gpt` to route every stage to codex. READ=explore/plan, MAKE=execute, VERIFY=eval
 // (a separate agent either way, so maker!=verifier holds).
@@ -26,7 +26,7 @@ const TIER = PROVIDER === 'gpt'
   : { read: { model: 'sonnet' }, make: { model: 'opus' }, verify: { model: 'sonnet' } }
 
 const TICKET = (args || '').replace(/\s*--provider=\S+/, '').trim()
-  || '(no ticket path passed — read the newest agent-loop/orchestrator/inbox/*.md with type: code-review)'
+  || '(no ticket path passed — read the newest agent-control-plane/orchestrator/inbox/*.md with type: code-review)'
 const MAX = 3
 
 // --- Delegation (see ../DELEGATION.md) -------------------------------------------------------

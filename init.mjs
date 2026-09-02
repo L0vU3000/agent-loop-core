@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// init.mjs — adopt the agent-loop into a project.
+// init.mjs — adopt the agent-control-plane into a project.
 //
 // What it does:
 //   1. Confirms this folder sits one level under a repo root (the machinery
@@ -8,7 +8,7 @@
 //   3. Checks whether STACK.md has been filled in — the one file that tells the
 //      pipelines what your database / ORM / auth / services layer actually are.
 //
-// Run once, from inside the agent-loop folder, right after you copy it in:
+// Run once, from inside the agent-control-plane folder, right after you copy it in:
 //   node init.mjs
 //
 // Pure Node built-ins — no npm install.
@@ -27,7 +27,7 @@ function log(line) {
 // --- 1. sanity: are we placed correctly? ---------------------------------
 if (!existsSync(join(REPO_ROOT, '.git'))) {
   log(`⚠  ${REPO_ROOT} is not a git repo root (no .git found).`)
-  log('   Place the agent-loop folder ONE level under your project root, e.g. <project>/agent-loop/.')
+  log('   Place the agent-control-plane folder ONE level under your project root, e.g. <project>/agent-control-plane/.')
   log('   Continuing anyway — the machinery only needs the folder layout, not git.\n')
 }
 
@@ -84,7 +84,7 @@ if (existsSync(heartbeat)) rmSync(heartbeat)
 log(`✔ Instance data reset (${wiped} stale item(s) cleared).`)
 
 // --- 3. install the project-level Claude command -------------------------
-// The template is copied into <project>/agent-loop, but Claude Code discovers commands only from
+// The template is copied into <project>/agent-control-plane, but Claude Code discovers commands only from
 // <project>/.claude/commands. Install the bundled entry point on first adoption without ever
 // overwriting a command the consuming project has customized.
 const bundledOrchestrateCommand = join(AGENT_LOOP_ROOT, '.claude', 'commands', 'orchestrate.md')
@@ -131,14 +131,14 @@ if (!existsSync(stackPath)) {
   } else {
     log(`\n⚠ STACK.md has ${blankRows.length} role(s) not yet filled in. The pipelines defer to it —`)
     log('   set the middle column for your database, ORM, auth, services layer, etc. before running:')
-    log('   → ' + join('agent-loop', 'STACK.md'))
+    log('   → ' + join('agent-control-plane', 'STACK.md'))
   }
 }
 
 // --- next steps -----------------------------------------------------------
 log('\nNext:')
-log('  • Fill in STACK.md:         agent-loop/STACK.md  (your database / ORM / auth / paths)')
+log('  • Fill in STACK.md:         agent-control-plane/STACK.md  (your database / ORM / auth / paths)')
 log('  • Use Claude intake:        /orchestrate <request>  (after reopening Claude Code)')
 log('  • Start a first work item:  drop a note in orchestrator/inbox/  (see orchestrator/orchestrator.md)')
-log('  • Run one tick:             node agent-loop/orchestrator/tick.mjs')
-log('  • Read the entry point:     agent-loop/agent-loop.md')
+log('  • Run one tick:             node agent-control-plane/orchestrator/tick.mjs')
+log('  • Read the entry point:     agent-control-plane/agent-control-plane.md')

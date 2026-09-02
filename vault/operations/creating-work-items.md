@@ -4,13 +4,13 @@ status: active
 created: 2026-07-21
 updated: 2026-07-21
 tags:
-  - agent-loop
+  - agent-control-plane
   - routing
 ---
 
 # Creating work items
 
-Create one Markdown file in `agent-loop/orchestrator/inbox/`:
+Create one Markdown file in `agent-control-plane/orchestrator/inbox/`:
 
 ```markdown
 ---
@@ -27,7 +27,7 @@ Done: the behavior is covered by a regression check and all relevant gates pass.
 
 Choose category and type from [[categories]] and [[pipelines/README]]. State observable completion,
 constraints, and risky approvals. Never include credentials or customer data. Validate a drafted
-item with `node agent-loop/orchestrator/check-work-item.mjs <path>` before dispatch.
+item with `node agent-control-plane/orchestrator/check-work-item.mjs <path>` before dispatch.
 
 A `type: feature` ticket that touches UI/UX can add `uiReview: true` to opt into the human UI/UX
 approval gate — the pipeline then submits a screenshot packet for human sign-off after Eval

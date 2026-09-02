@@ -45,7 +45,7 @@ function readUsageEvidence(path) {
 
 function buildPrompt({ run, workItem }) {
   return [
-    'You are the maker for one bounded agent-loop bug-fix transaction.',
+    'You are the maker for one bounded agent bug-fix transaction.',
     `Run ID: ${run.runId}`,
     '',
     'Work item:',
@@ -89,7 +89,7 @@ export function createHermesMakerRuntime({
     throw new Error('unsandboxed credential access must be explicitly acknowledged')
   }
   return async function executeHermesMaker({ workspace, run, workItem }) {
-    const runtimeRoot = mkdtempSync(join(tmpdir(), `agent-loop-${run.runId}-hermes-`))
+    const runtimeRoot = mkdtempSync(join(tmpdir(), `agent-control-plane-${run.runId}-hermes-`))
     const usagePath = join(runtimeRoot, 'usage.json')
     try {
       const args = [

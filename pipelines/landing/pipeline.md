@@ -61,7 +61,7 @@ Every Eval failure writes evidence and returns to Plan before another Execute at
   external write.
 - **Bounds:** at most 3 attempts, 7 agent calls per invocation, and a declared 35,000-token ceiling.
 - **No progress:** stop after the same verifier failure repeats twice.
-- **Memory:** append reusable landing failures to `agent-loop/memory/errors.md`.
+- **Memory:** append reusable landing failures to `agent-control-plane/memory/errors.md`.
 - **Authoring safety:** structural checks never merge, push, deploy, roll back, or publish.
 
 ## Status and trigger

@@ -19,12 +19,12 @@
 //     record is keyed by run id: one active packet per run.
 //
 // Usage:
-//   node agent-loop/orchestrator/review-gate.mjs --submit --run <id> --commit <sha>
+//   node agent-control-plane/orchestrator/review-gate.mjs --submit --run <id> --commit <sha>
 //     --artifact <path> [--artifact <path> ...] --route <route> [--route <route> ...]
 //     --viewport <viewport> [--viewport <viewport> ...] [--notes "..."]
-//   node agent-loop/orchestrator/review-gate.mjs --approve --run <id> --commit <sha> --digest <digest>
-//   node agent-loop/orchestrator/review-gate.mjs --reject  --run <id> --commit <sha> --digest <digest> --feedback "..."
-//   node agent-loop/orchestrator/review-gate.mjs --status  --run <id> [--json]
+//   node agent-control-plane/orchestrator/review-gate.mjs --approve --run <id> --commit <sha> --digest <digest>
+//   node agent-control-plane/orchestrator/review-gate.mjs --reject  --run <id> --commit <sha> --digest <digest> --feedback "..."
+//   node agent-control-plane/orchestrator/review-gate.mjs --status  --run <id> [--json]
 
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'

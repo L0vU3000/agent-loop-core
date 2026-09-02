@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Regenerate agent-loop/dashboard.md from real filesystem state.
+# Regenerate agent-control-plane/dashboard.md from real filesystem state.
 # Sources of truth (never hand-maintained):
 #   - orchestrator/inbox/*.md          -> Queued
 #   - pipelines/*/runs/*/ (no eval.md) -> Running
 #   - pipelines/*/runs/*/eval.md       -> Completed (verdict parsed from the file)
 # Run on demand, on a /loop cadence, or from the orchestrator after each dispatch.
 set -euo pipefail
-cd "$(dirname "$0")/.."   # -> agent-loop/
+cd "$(dirname "$0")/.."   # -> agent-control-plane/
 OUT=dashboard.md
 NOW=$(date "+%Y-%m-%d %H:%M")
 

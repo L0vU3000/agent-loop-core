@@ -11,7 +11,7 @@
 - The **orchestrator** uses both to route an inbox item, then dispatches one pipeline.
 
 Categories are metadata, not another directory level. Keep pipeline definitions at
-`agent-loop/pipelines/<pipeline-name>/` so the dashboard, ignore rules, and machinery checks
+`agent-control-plane/pipelines/<pipeline-name>/` so the dashboard, ignore rules, and machinery checks
 continue to work with one stable layout.
 
 ## Categories
@@ -102,9 +102,17 @@ created: YYYY-MM-DD
 ---
 ```
 
-The orchestrator validates the pair against its registry. If a future factory-router accepts
-an unspecified type, it may use the category to narrow candidates before selecting a pipeline.
-Until then, `type` remains the exact routing key.
+The orchestrator validates the pair against its registry. Dynamic intake may be evidence-driven:
+when it can identify only a category, it may ask the read-only registry seam for the candidates:
+
+```bash
+node agent-control-plane/orchestrator/dispatch.mjs --candidates <category> --json
+```
+
+That call only narrows the registered choices; it neither chooses a pipeline nor changes inbox
+state. The intake agent or human must choose one `type`, write a testable `"Done" =` condition,
+and pass `check-work-item.mjs` before filing the normal typed item. `type` therefore remains the
+exact deterministic dispatch key, while category-only triage remains flexible and non-mutating.
 
 ## Current pipelines
 

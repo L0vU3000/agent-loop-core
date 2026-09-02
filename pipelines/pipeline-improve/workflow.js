@@ -8,7 +8,7 @@ export const meta = {
   phases: [{ title: 'Select and plan' }, { title: 'Improve and verify' }],
 }
 
-const P = 'agent-loop/pipelines/pipeline-improve'
+const P = 'agent-control-plane/pipelines/pipeline-improve'
 const RAW_ARGS = args || ''
 const MAX_ATTEMPTS = 3
 const MAX_AGENT_CALLS = 8
@@ -160,7 +160,7 @@ const exploration = await agent(
        do not edit tracked files or mint a new run-id.`
     : `You are the read-only EXPLORE stage of pipeline-improve. Follow ${P}/explore.md.
        Evidence hint: ${EVIDENCE_HINT || '(none; rank memory and recent run evidence)'}.
-       Read agent-loop memory and recent eval evidence. Select exactly one reproducible
+       Read agent-control-plane memory and recent eval evidence. Select exactly one reproducible
        machinery weakness. Capture the starting ESLint warning count for \`app lib components\`.
        Mint one shared run-id with \`date "+%Y-%m-%d-%H%M%S"\`, create ${P}/runs/<run-id>, and
        write explore.md only. Return selected, runId, candidateId, improvement, focusedCommand,
@@ -244,7 +244,7 @@ const gates = await agent(
   `You are the GATE RUNNER for pipeline-improve run ${RUN}, attempt ${attempt} — a mechanical
    executor, not a judge. From the repo root run these EXACT commands and report only what they
    produce. Make no rubric judgment and edit nothing:
-     1. bash agent-loop/scripts/check-machinery.sh   → machineryPasses = every line ok and exit 0
+     1. bash agent-control-plane/scripts/check-machinery.sh   → machineryPasses = every line ok and exit 0
      2. npx vitest run                                → vitestPassed / vitestTotal
      3. npx tsc --noEmit                              → tscErrors = error count (0 if clean)
      4. npx eslint app lib components                 → eslintCount = total warnings + errors
@@ -300,7 +300,7 @@ if (!callBudgetAvailable()) {
 recordAgentCall()
 await agent(
   `You are the failure-memory recorder for pipeline-improve run ${RUN}, attempt ${attempt}.
-   Append one factual entry to agent-loop/memory/errors.md using its Symptom / Cause / Fix /
+   Append one factual entry to agent-control-plane/memory/errors.md using its Symptom / Cause / Fix /
    Prevention format. Failure: ${failure}. Keep an unproven cause explicitly unknown and edit
    no other file.`,
   { label: `memory#${attempt}`, phase: 'Improve and verify', ...TIER.read },

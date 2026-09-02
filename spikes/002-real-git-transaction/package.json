@@ -1,5 +1,5 @@
 {
-  "name": "agent-loop-real-git-transaction-spike",
+  "name": "agent-control-plane-real-git-transaction-spike",
   "private": true,
   "version": "0.0.0",
   "type": "module",

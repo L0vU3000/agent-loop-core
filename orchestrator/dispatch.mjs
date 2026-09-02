@@ -15,22 +15,27 @@
 // machinery self-check uses (no second copy of the routing table to drift).
 //
 // Usage:
-//   node agent-loop/orchestrator/dispatch.mjs            # print the dispatch plan
-//   node agent-loop/orchestrator/dispatch.mjs --json     # machine-readable plan
-//   node agent-loop/orchestrator/dispatch.mjs --claim <file>
+//   node agent-control-plane/orchestrator/dispatch.mjs            # print the dispatch plan
+//   node agent-control-plane/orchestrator/dispatch.mjs --json     # machine-readable plan
+//   node agent-control-plane/orchestrator/dispatch.mjs --claim <file>
 //                                                        # mark an item in-progress (atomic move
 //                                                        # into inbox/in-progress/) so a second
 //                                                        # concurrent tick cannot re-dispatch it.
-//   node agent-loop/orchestrator/dispatch.mjs --reclaim <file>
+//   node agent-control-plane/orchestrator/dispatch.mjs --reclaim <file>
 //                                                        # return a STALE claim to the inbox so it
 //                                                        # can be dispatched again (refuses a claim
 //                                                        # younger than the staleness threshold).
-//   node agent-loop/orchestrator/dispatch.mjs --record <file> <pass|fail> [--summary "..."]
+//   node agent-control-plane/orchestrator/dispatch.mjs --record <file> <pass|fail> [--summary "..."]
 //                                                        # finalize a run: move + changelog
 //                                                        # a claimed PASS on a code-changing
 //                                                        # pipeline is re-verified here (fast
 //                                                        # objective gates); add --skip-gate to
 //                                                        # bypass for a quick manual record.
+//   node agent-control-plane/orchestrator/dispatch.mjs --candidates <category>
+//                                                        # dynamic intake/triage seam: list the
+//                                                        # pipelines registered under a valid
+//                                                        # category. Read-only — never dispatches,
+//                                                        # claims, or touches inbox state.
 //                                                        # A claimed PASS on an item whose
 //                                                        # frontmatter sets uiReview: true is
 //                                                        # additionally refused unless
@@ -42,7 +47,7 @@
 //                                                        # that commit. --skip-gate does NOT bypass
 //                                                        # this — it only bypasses the objective
 //                                                        # machinery+tsc gate above.
-//   node agent-loop/orchestrator/dispatch.mjs --record <file> pass --next <type>[,<type>]
+//   node agent-control-plane/orchestrator/dispatch.mjs --record <file> pass --next <type>[,<type>]
 //                                                        # draw the graph EDGE: propose successor
 //                                                        # work item(s) under inbox/next/. Drafts
 //                                                        # only — nothing routes until a human
@@ -97,7 +102,7 @@ function inboxItemFiles(inboxDirectory) {
     .sort()
 }
 
-// Pure planner: given the agent-loop root, return the routing decision for every inbox item.
+// Pure planner: given the agent-control-plane root, return the routing decision for every inbox item.
 // No side effects — this is the piece the regression test drives against fixtures.
 export function planDispatch(agentLoopRoot = DEFAULT_AGENT_LOOP_ROOT) {
   const registry = validatePipelineRegistry(agentLoopRoot)
@@ -199,6 +204,66 @@ export function recordOutcome(agentLoopRoot, file, outcome, summary = '') {
   return { moved: `inbox/${archiveName}/${file}` }
 }
 
+// --- Category candidates: a read-only seam for dynamic intake/triage --------------------------
+// A dynamic, evidence-driven intake/triage stage may narrow a request to a valid `category`
+// before it can name an exact `type` (see categories.md "Routing metadata"). This function is
+// the ONLY thing that stage may call: it asks the same registry planDispatch() reads for the
+// pipelines registered under that category, and returns nothing more. It never reads or touches
+// inbox/*, never claims, never dispatches, never mutates state — it is a pure lookup against the
+// canonical registry, so its answer cannot drift from what planDispatch() will actually route.
+// The deterministic dispatcher remains the only component that turns a checked category+type
+// pair into a claim and a running pipeline; this function only ever narrows candidates for a
+// human or agent to choose from, and does not choose one itself.
+export function candidatePipelinesForCategory(agentLoopRoot, category) {
+  const registry = validatePipelineRegistry(agentLoopRoot)
+
+  // Same refusal as planDispatch(): a broken registry cannot yield a trustworthy candidate list,
+  // so fail closed with no candidates rather than answer from a partial or inconsistent registry.
+  if (!registry.ok) {
+    return {
+      ok: false,
+      category,
+      candidates: [],
+      reason: 'the pipeline registry is broken — refusing to answer from an inconsistent registry',
+      registryErrors: registry.errors,
+    }
+  }
+
+  const byCategory = new Map()
+  for (const definition of registry.definitions) {
+    if (!byCategory.has(definition.category)) {
+      byCategory.set(definition.category, [])
+    }
+    byCategory.get(definition.category).push(definition)
+  }
+
+  if (!byCategory.has(category)) {
+    const known = [...byCategory.keys()].sort().join(', ')
+    return {
+      ok: false,
+      category,
+      candidates: [],
+      reason: `unknown category "${category}" — valid categories are: ${known}`,
+    }
+  }
+
+  // Sorted by type for a deterministic, reproducible answer. Priority is a per-item property set
+  // when an item is filed, not a property of a pipeline, so it has no bearing on this ordering —
+  // this list is "priority-safe" precisely because it carries no priority to get wrong.
+  const candidates = byCategory.get(category)
+    .map((definition) => ({ type: definition.type, pipeline: definition.name }))
+    .sort((a, b) => a.type.localeCompare(b.type))
+
+  return {
+    ok: true,
+    category,
+    candidates,
+    note: 'Candidate pipelines only, not a decision — choosing one still requires human/agent '
+      + 'judgment and a testable "Done" line (see check-work-item.mjs) before a typed item is '
+      + 'filed in inbox/. This lookup never dispatches, claims, or mutates inbox state.',
+  }
+}
+
 // --- Graph edges: propose a successor after a PASS -------------------------------------------
 // The loop layer was already done: one pipeline = one node = explore→plan→execute→eval with its
 // own separate verifier. What had no representation anywhere was the layer above — an EDGE. A
@@ -291,7 +356,7 @@ Proposed successor: \`${predecessorFile}\` passed and hands off to the **${pipel
 TODO before this can route: replace this paragraph with the exit condition for THIS node — one
 line a fresh verifier could check without you. The upstream exit condition is not inherited; this
 node has a different job. Then move the file into \`orchestrator/inbox/\` and validate it with
-\`node agent-loop/orchestrator/check-work-item.mjs\`.
+\`node agent-control-plane/orchestrator/check-work-item.mjs\`.
 
 ## Do NOT
 
@@ -565,6 +630,38 @@ function runCli() {
       process.stdout.write(`reclaimed: moved to ${result.moved}\n`)
     } catch (error) {
       process.stderr.write(`reclaim failed: ${error.message}\n`)
+      process.exitCode = 1
+    }
+    return
+  }
+
+  // Dynamic intake/triage seam: given only a valid category, list the registered pipeline
+  // choices. Read-only — it never claims, dispatches, or touches inbox state.
+  const candidatesIndex = args.indexOf('--candidates')
+  if (candidatesIndex !== -1) {
+    const category = args[candidatesIndex + 1]
+    if (!category) {
+      process.stderr.write('usage: --candidates <category>\n')
+      process.exitCode = 1
+      return
+    }
+    const result = candidatePipelinesForCategory(root, category)
+    if (args.includes('--json')) {
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+      if (!result.ok) {
+        process.exitCode = 1
+      }
+    } else if (result.ok) {
+      process.stdout.write(`candidate pipelines for category "${category}":\n`)
+      for (const candidate of result.candidates) {
+        process.stdout.write(`  type=${candidate.type}  ->  ${candidate.pipeline}\n`)
+      }
+      process.stdout.write(`\n${result.note}\n`)
+    } else {
+      process.stderr.write(`${result.reason}\n`)
+      for (const error of result.registryErrors ?? []) {
+        process.stderr.write(`FAIL  registry: ${error}\n`)
+      }
       process.exitCode = 1
     }
     return

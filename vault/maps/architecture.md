@@ -4,7 +4,7 @@ status: active
 created: 2026-07-21
 updated: 2026-07-21
 tags:
-  - agent-loop
+  - agent-control-plane
   - map
 ---
 
@@ -17,6 +17,6 @@ tags:
 - [[vault/architecture/distribution-model]] — copy-and-own template distribution
 - [[vault/concepts/maker-verifier-separation]] — independent judgment
 - [[vault/concepts/evaluation-and-exit-conditions]] — evidence and stopping rules
-- [[agent-loop|Canonical operating principles]]
+- [[agent-control-plane|Canonical operating principles]]
 - [[orchestrator/orchestrator|Canonical orchestrator contract]]
 - [[pipelines/README|Canonical pipeline anatomy]]

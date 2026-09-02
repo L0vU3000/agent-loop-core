@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke self-check for the agent-loop machinery itself ("test the tools").
+# Smoke self-check for the agent-control-plane machinery itself ("test the tools").
 # Fails loudly (exit 1) if any pipeline's scaffolding is broken:
 #   1. every pipelines/*/workflow.js is syntactically valid ESM
 #   2. every pipeline has the four stage files + pipeline.md
@@ -10,9 +10,9 @@
 #   6. pipeline frontmatter agrees with all three registry tables
 #   7. the orchestrator dispatcher routes/validates inbox items against that registry
 # Run it after editing any workflow.js or the dashboard script:
-#   bash agent-loop/scripts/check-machinery.sh
+#   bash agent-control-plane/scripts/check-machinery.sh
 set -euo pipefail
-cd "$(dirname "$0")/.."   # -> agent-loop/
+cd "$(dirname "$0")/.."   # -> agent-control-plane/
 
 fail=0
 say()  { printf '%s\n' "$*"; }

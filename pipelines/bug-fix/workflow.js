@@ -4,7 +4,7 @@
 // different model. A single runId is minted once and threaded through every stage
 // (lesson from memory/errors.md — do not let stages invent their own).
 //
-// Pass the ticket path as args, e.g. Workflow({scriptPath, args: 'agent-loop/orchestrator/inbox/<ticket>.md'})
+// Pass the ticket path as args, e.g. Workflow({scriptPath, args: 'agent-control-plane/orchestrator/inbox/<ticket>.md'})
 
 export const meta = {
   name: 'bug-fix',
@@ -12,7 +12,7 @@ export const meta = {
   phases: [{ title: 'Reproduce' }, { title: 'Fix loop' }],
 }
 
-const P = 'agent-loop/pipelines/bug-fix'
+const P = 'agent-control-plane/pipelines/bug-fix'
 const LINT = 'npx eslint app lib components'
 const MAX = 6
 const SHA256 = /^[a-f0-9]{64}$/i
@@ -28,7 +28,7 @@ const TIER = PROVIDER === 'gpt'
   : { read: { model: 'sonnet' }, make: { model: 'opus' }, verify: { model: 'sonnet' } }
 
 const TICKET = (args || '').replace(/\s*--provider=\S+/, '').trim()
-  || '(no ticket path passed — read the newest agent-loop/orchestrator/inbox/*.md with type: bug)'
+  || '(no ticket path passed — read the newest agent-control-plane/orchestrator/inbox/*.md with type: bug)'
 
 const REPRO = { type: 'object', required: ['reproduced', 'runId'],
   properties: {

@@ -8,6 +8,22 @@
 This is the one piece the [skills library](../skills-library.md) doesn't give us for
 free — everything below the router already exists. Build it **after** one pipeline works.
 
+## The full shape, end to end
+
+```
+dynamic intake/triage  →  typed checked work item  →  deterministic dispatch  →
+isolated explore/plan/execute/eval  →  commit-bound objective gates  →
+independent verification  →  record outcome
+```
+
+A dynamic, evidence-driven intake/triage stage (a chat command, an agent, a future tool) may
+select or narrow a pipeline down to a **category** before it can commit to an exact **type** —
+see [`candidate pipelines for a category`](#dynamic-intake-category-candidates-read-only) below.
+It never becomes the thing that dispatches: the deterministic router above remains the **only**
+component that turns a checked `category`+`type` pair into a claim and a running, isolated
+pipeline. Models used inside any stage are selected by the host/orchestrator (whatever runs the
+Workflow), never hard-coded by this core — this router and its registry stay model-agnostic.
+
 ---
 
 ## The heartbeat (the loop)
@@ -30,7 +46,7 @@ The **dashboard** (`../dashboard.md`) is the at-a-glance view of what's running 
 completed. It is **generated** by [`scripts/update-dashboard.sh`](../scripts/update-dashboard.sh)
 from real state (inbox files + run folders) — never hand-edited, so it can't drift. Keep it
 fresh three ways: the orchestrator regenerates it each tick (step 3); or `/loop 2m bash
-agent-loop/scripts/update-dashboard.sh` while a workflow runs; or run it by hand anytime.
+agent-control-plane/scripts/update-dashboard.sh` while a workflow runs; or run it by hand anytime.
 
 Keep the router's own context **lean** — it reads a one-line summary per item and a
 pipeline registry, nothing more. It must never accumulate the full history of every run
@@ -152,10 +168,10 @@ The routing + bookkeeping half of the heartbeat is now executable:
 that should never spend a model call.
 
 ```
-node agent-loop/orchestrator/dispatch.mjs            # print the dispatch plan (dry run)
-node agent-loop/orchestrator/dispatch.mjs --json     # same plan, machine-readable
-node agent-loop/orchestrator/dispatch.mjs --record <file> <pass|fail> [--summary "..."]
-node agent-loop/orchestrator/dispatch.mjs --record <file> pass --next <type>[,<type>]
+node agent-control-plane/orchestrator/dispatch.mjs            # print the dispatch plan (dry run)
+node agent-control-plane/orchestrator/dispatch.mjs --json     # same plan, machine-readable
+node agent-control-plane/orchestrator/dispatch.mjs --record <file> <pass|fail> [--summary "..."]
+node agent-control-plane/orchestrator/dispatch.mjs --record <file> pass --next <type>[,<type>]
 ```
 
 What it does each tick:
@@ -184,6 +200,28 @@ What it does each tick:
    workspace; on a `pass` land the worktree's change onto the live branch first, then record from the
    live tree so the doorway re-runs its gates against the landed change.
 
+### Dynamic intake — category candidates (read-only)
+
+A dynamic intake/triage stage (a chat command, an agent, or a future tool) sometimes narrows a
+request to a valid `category` before it can commit to an exact `type`. `dispatch.mjs` exposes one
+seam for exactly that case, and nothing more:
+
+```
+node agent-control-plane/orchestrator/dispatch.mjs --candidates <category>          # human-readable
+node agent-control-plane/orchestrator/dispatch.mjs --candidates <category> --json   # machine-readable
+```
+
+It looks up the same registry `planDispatch()` reads and returns the pipelines registered under
+that category — deterministic (sorted by `type`) and priority-safe (priority is a per-item
+property set when an item is filed, never a property of a pipeline, so it plays no part in this
+list). An unknown category is rejected with the known set named, never guessed. This call **never
+dispatches, claims, or mutates inbox state** — it cannot move, create, or archive anything under
+`inbox/`. Its output always says so, because narrowing to a category is not a decision: picking
+one candidate still requires human/agent judgment and a testable `"Done" =` line
+([`check-work-item.mjs`](./check-work-item.mjs)) before a typed item is filed and the deterministic
+dispatcher above can route it. This is not the deferred factory-router agent described below — it
+does not select a pipeline or a model, it only lists what already exists in the registry.
+
 ### The one boundary: it routes, it does not execute
 
 A pipeline is a `workflow.js` run by the built-in **Workflow runtime** (the harness), which a
@@ -198,7 +236,7 @@ emits *which* workflow to run for *which* item; the runtime runs it and reports 
 primitives allow. Trigger it on a cadence (never a raw `while(true)`):
 
 ```
-/loop 30m node agent-loop/orchestrator/tick.mjs      # local
+/loop 30m node agent-control-plane/orchestrator/tick.mjs      # local
 # or a /schedule cloud routine running the same command
 ```
 

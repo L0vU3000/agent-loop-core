@@ -1,4 +1,4 @@
-# Decisions — agent-loop system (ADRs)
+# Decisions — agent-control-plane system (ADRs)
 
 > Why the loop is built the way it is. Newest first. One entry per load-bearing choice.
 > Format: `## [YYYY-MM-DD] <decision>` → **Context / Choice / Why / Revisit-if**.

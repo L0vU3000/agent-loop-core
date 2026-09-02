@@ -70,7 +70,7 @@ Every Eval failure writes evidence and returns to Plan before another Execute at
   and a declared 45,000-token ceiling.
 - **No progress:** stop after the same evidence failure repeats twice or signals cannot be tied to the
   approved deployment.
-- **Memory:** append reusable canary or rollback failures to `agent-loop/memory/errors.md`.
+- **Memory:** append reusable canary or rollback failures to `agent-control-plane/memory/errors.md`.
 - **Authoring safety:** structural checks never browse production, deploy, roll back, merge, or
   publish.
 

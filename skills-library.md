@@ -1,7 +1,7 @@
 # Skills Library — the loop toolkit we already have installed
 
 > The parts we assemble from. We do **not** hand-roll loop plumbing — these skills
-> already implement the [loop anatomy](./agent-loop.md). Ranked by the one principle
+> already implement the [loop anatomy](./agent-control-plane.md). Ranked by the one principle
 > that decides everything: **maker ≠ verifier** (the agent doing the work must not be
 > the agent that grades it).
 >
@@ -14,7 +14,7 @@
 
 > **All built-in. No external dependency.** We deliberately do **not** depend on `paseo-loop`
 > (it needs the third-party Paseo daemon) — see [decision](./memory/decisions.md). Everything
-> here ships with Claude Code, so agent-loop keeps working even if other tools are uninstalled.
+> here ships with Claude Code, so agent-control-plane keeps working even if other tools are uninstalled.
 
 | Primitive | What it does | Maker≠Verifier | Use it for |
 |---|---|---|---|

@@ -10,8 +10,8 @@
 // needs no pruning (the raw history lives in run-metrics.jsonl and the runs/ folders).
 //
 // Usage:
-//   node agent-loop/orchestrator/improvement-digest.mjs           # rewrite the backlog snapshot
-//   node agent-loop/orchestrator/improvement-digest.mjs --print   # print it instead of writing
+//   node agent-control-plane/orchestrator/improvement-digest.mjs           # rewrite the backlog snapshot
+//   node agent-control-plane/orchestrator/improvement-digest.mjs --print   # print it instead of writing
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'

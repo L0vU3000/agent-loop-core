@@ -11,7 +11,7 @@ export const meta = {
 }
 
 const LINT = 'npx eslint app lib components'
-const P = 'agent-loop/pipelines/eslint-burndown'
+const P = 'agent-control-plane/pipelines/eslint-burndown'
 const MAX = 6 // bound: never runs forever
 
 // Provider-adaptive model tiers — Anthropic by default (the loop runs under Claude Code, so the

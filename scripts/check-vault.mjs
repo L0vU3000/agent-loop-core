@@ -32,7 +32,7 @@ const REQUIRED_OPERATIONAL_PATHS = [
   '.gitignore',
   'README.md',
   'STACK.md',
-  'agent-loop.md',
+  'agent-control-plane.md',
   'categories.md',
   'orchestrator/orchestrator.md',
   'orchestrator/dispatch-log.md',
@@ -97,7 +97,7 @@ const REQUIRED_VAULT_PATHS = [
 
 const REQUIRED_HOME_LINKS = [
   'README',
-  'agent-loop',
+  'agent-control-plane',
   'categories',
   'orchestrator/orchestrator',
   'pipelines/README',
@@ -212,7 +212,7 @@ function validateFrontmatter(path, source, errors) {
   }
 
   if (!fields.has('tags')) errors.push(`${path}: missing tags field`)
-  if (!/^\s+- agent-loop\s*$/m.test(source)) errors.push(`${path}: tags must include agent-loop`)
+  if (!/^\s+- agent-control-plane\s*$/m.test(source)) errors.push(`${path}: tags must include agent-control-plane`)
 }
 
 export function wikilinkTargets(source) {

@@ -8,7 +8,7 @@ export const meta = {
   phases: [{ title: 'Explore and plan' }, { title: 'Deploy and verify' }],
 }
 
-const P = 'agent-loop/pipelines/deploy'
+const P = 'agent-control-plane/pipelines/deploy'
 const RAW_ARGS = args || ''
 const MAX_ATTEMPTS = 3
 const MAX_AGENT_CALLS = 7
@@ -262,7 +262,7 @@ const repeatCount = failure === exploration.lastFailure ? exploration.repeatCoun
 recordAgentCall()
 await agent(
   `You are the failure-memory recorder for deploy run ${RUN}, attempt ${attempt}. Append one factual
-   Symptom / Cause / Fix / Prevention entry to agent-loop/memory/errors.md only if this failure
+   Symptom / Cause / Fix / Prevention entry to agent-control-plane/memory/errors.md only if this failure
    exposes a reusable provider, health, or machinery landmine. Failure: ${failure}. Keep unknown
    causes explicit and edit no other tracked file.`,
   { label: `memory#${attempt}`, phase: 'Deploy and verify', ...TIER.read },

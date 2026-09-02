@@ -4,7 +4,7 @@ status: active
 created: 2026-07-21
 updated: 2026-07-21
 tags:
-  - agent-loop
+  - agent-control-plane
   - verification
 ---
 
@@ -24,15 +24,15 @@ with the exact commit + digest the run reported (there is no automated Telegram 
 v1, so a Telegram message alone never decides anything):
 
 ```
-node agent-loop/orchestrator/review-gate.mjs --approve --run <id> --commit <sha> --digest <digest>
-node agent-loop/orchestrator/review-gate.mjs --reject  --run <id> --commit <sha> --digest <digest> --feedback "..."
+node agent-control-plane/orchestrator/review-gate.mjs --approve --run <id> --commit <sha> --digest <digest>
+node agent-control-plane/orchestrator/review-gate.mjs --reject  --run <id> --commit <sha> --digest <digest> --feedback "..."
 ```
 
 Approval alone does not record the item. Cite that exact approved run/commit/digest at the record
 doorway:
 
 ```
-node agent-loop/orchestrator/dispatch.mjs --record <file> pass --review-run <id> --review-commit <sha> --review-digest <digest>
+node agent-control-plane/orchestrator/dispatch.mjs --record <file> pass --review-run <id> --review-commit <sha> --review-digest <digest>
 ```
 
 The record doorway refuses a `uiReview: true` item — `--skip-gate` included — unless a

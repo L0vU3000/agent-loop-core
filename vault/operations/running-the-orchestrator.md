@@ -4,7 +4,7 @@ status: active
 created: 2026-07-21
 updated: 2026-07-21
 tags:
-  - agent-loop
+  - agent-control-plane
   - orchestrator
 ---
 
@@ -13,7 +13,7 @@ tags:
 Use one scheduled tick rather than an open-ended shell loop:
 
 ```bash
-node agent-loop/orchestrator/tick.mjs
+node agent-control-plane/orchestrator/tick.mjs
 ```
 
 The tick validates the pipeline registry and inbox, refreshes `dashboard.md`, and prints the

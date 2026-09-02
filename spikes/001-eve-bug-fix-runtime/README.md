@@ -2,7 +2,7 @@
 
 ## Question
 
-**Given** `agent-loop-core` can deterministically route and record work but cannot invoke its current Workflow harness from Node, **when** Eve executes one fixture `bug-fix` pipeline, **then** can it preserve the existing run-id, rubric-lock, maker/verifier, bounded-loop, and objective-record contracts while surviving a runtime restart?
+**Given** `agent-control-plane` can deterministically route and record work but cannot invoke its current Workflow harness from Node, **when** Eve executes one fixture `bug-fix` pipeline, **then** can it preserve the existing run-id, rubric-lock, maker/verifier, bounded-loop, and objective-record contracts while surviving a runtime restart?
 
 ## Verdict: PARTIAL
 
@@ -47,7 +47,7 @@ Eve snapshot
     -> separate Eve subagent sessions
 ```
 
-This preserves `agent-loop-core` as the routing and policy source of truth while keeping the Eve runtime portable and snapshot-safe.
+This preserves `agent-control-plane` as the routing and policy source of truth while keeping the Eve runtime portable and snapshot-safe.
 
 ## Separately validated contracts
 

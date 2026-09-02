@@ -21,7 +21,7 @@ canonical claim
   -> canonical pass record
 ```
 
-This is the first proof in `agent-loop-core` that a real model can complete the approved claim-to-record transaction. It remains **PARTIAL**, not production-ready, because the target is still a small disposable fixture, the agent process is not filesystem/network sandboxed, interruption recovery and a real failed-first-attempt retry are unproved, and the implementation still lives under `spikes/` rather than a supported installable runtime.
+This is the first proof in `agent-control-plane` that a real model can complete the approved claim-to-record transaction. It remains **PARTIAL**, not production-ready, because the target is still a small disposable fixture, the agent process is not filesystem/network sandboxed, interruption recovery and a real failed-first-attempt retry are unproved, and the implementation still lives under `spikes/` rather than a supported installable runtime.
 
 ## Runtime boundary
 
@@ -86,13 +86,13 @@ The demo performs no push, merge, deployment, or remote Git operation.
 
 A final live run against the exact current code produced:
 
-- demo root: `/tmp/agent-loop-spike-003-live-g7Zkkp`;
+- demo root: `/tmp/agent-control-plane-spike-003-live-g7Zkkp`;
 - run ID: `run-spike-003-1785146453732`;
 - provider/model: `openai-codex` / `gpt-5.6-sol`;
 - provider calls: `9`;
 - base commit: `78b2e86b85d990149fd46c6934d7da89174f468f`;
 - preflight: expected failure, exit code `1`;
-- maker branch: `agent-loop/run-spike-003-1785146453732-maker`;
+- maker branch: `agent-control-plane/run-spike-003-1785146453732-maker`;
 - maker commit: `d3fd6884861781b206a981f35126d609863456e4`;
 - maker parent: exactly the base commit;
 - maker commit shape: one non-merge child and one reachable commit after base;
@@ -122,6 +122,6 @@ Automated verification:
 4. Exercise a failed first real attempt followed by a distinct second maker commit.
 5. Add idempotent interruption recovery after claim, maker commit, verification, evidence persistence, and canonical recording.
 6. Add a real filesystem/network sandbox before executing untrusted repositories or tests.
-7. Add runtime/provider capability checks to an `agent-loop doctor` command.
+7. Add runtime/provider capability checks to an `agent-control-plane doctor` command.
 
 Do not add more pipeline types, automatic push/merge, deployment, or production credentials before this vertical slice is productized and recovery-tested.

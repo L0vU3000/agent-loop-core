@@ -8,7 +8,7 @@ export const meta = {
   phases: [{ title: 'Measure and plan' }, { title: 'Change and verify' }],
 }
 
-const P = 'agent-loop/pipelines/performance-burndown'
+const P = 'agent-control-plane/pipelines/performance-burndown'
 const RAW_ARGS = args || ''
 const MAX_ATTEMPTS = 6
 const MAX_AGENT_CALLS = 7
@@ -379,7 +379,7 @@ if (!budgetAvailable()) {
 recordAgentCall()
 await agent(
   `You are the failure-memory recorder for performance-burndown run ${RUN}, attempt ${attempt}.
-   Append one factual Symptom / Cause / Fix / Prevention entry to agent-loop/memory/errors.md only
+   Append one factual Symptom / Cause / Fix / Prevention entry to agent-control-plane/memory/errors.md only
    when this failure exposes a reusable measurement landmine or rejected lever. Failure: ${failure}.
    Keep an unproven cause explicitly unknown and edit no other tracked file.`,
   { label: `memory#${attempt}`, phase: 'Change and verify', ...TIER.read },

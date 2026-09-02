@@ -14,10 +14,10 @@ import { createHermesMakerRuntime } from './lib/hermes-maker-runtime.mjs'
 const HERE = resolve(fileURLToPath(new URL('.', import.meta.url)))
 const AGENT_LOOP_ROOT = resolve(HERE, '../..')
 const keep = process.argv.includes('--keep')
-const demoRoot = mkdtempSync(join(tmpdir(), 'agent-loop-spike-003-live-'))
+const demoRoot = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-003-live-'))
 
 try {
-  const controlPlaneRoot = join(demoRoot, 'agent-loop')
+  const controlPlaneRoot = join(demoRoot, 'agent-control-plane')
   const repositoryRoot = join(demoRoot, 'fixture-repository')
   const workspaceRoot = join(demoRoot, 'runtime-workspaces')
   const runId = `run-spike-003-${Date.now()}`

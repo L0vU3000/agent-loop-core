@@ -13,18 +13,18 @@ import {
 import { runRealGitTransaction } from './lib/run-transaction.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const agentLoopSourceRoot = resolve(here, '../..')
-const root = mkdtempSync(join(tmpdir(), 'agent-loop-spike-002-demo-'))
-const agentLoopRoot = join(root, 'agent-loop')
+const controlPlaneSourceRoot = resolve(here, '../..')
+const root = mkdtempSync(join(tmpdir(), 'agent-control-plane-spike-002-demo-'))
+const controlPlaneRoot = join(root, 'agent-control-plane')
 const repositoryRoot = join(root, 'fixture-repository')
 const workspaceRoot = join(root, 'runtime-workspaces')
 
-copyControlPlaneFixture(agentLoopSourceRoot, agentLoopRoot)
-writeBugItem(agentLoopRoot)
+copyControlPlaneFixture(controlPlaneSourceRoot, controlPlaneRoot)
+writeBugItem(controlPlaneRoot)
 createBrokenRepository(repositoryRoot)
 
 const result = await runRealGitTransaction({
-  agentLoopRoot,
+  agentLoopRoot: controlPlaneRoot,
   repositoryRoot,
   workspaceRoot,
   runId: `run-spike-002-${Date.now()}`,

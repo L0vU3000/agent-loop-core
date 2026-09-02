@@ -12,8 +12,8 @@
 // the golden rule of tuning: never cut cost without the paired quality signal to hold constant.
 //
 // Usage:
-//   node agent-loop/orchestrator/metrics.mjs            # harvest new runs into the ledger
-//   node agent-loop/orchestrator/metrics.mjs --summary  # per-pipeline cost roll-up from the ledger
+//   node agent-control-plane/orchestrator/metrics.mjs            # harvest new runs into the ledger
+//   node agent-control-plane/orchestrator/metrics.mjs --summary  # per-pipeline cost roll-up from the ledger
 
 import { existsSync, readFileSync, readdirSync, appendFileSync } from 'node:fs'
 import { homedir } from 'node:os'
